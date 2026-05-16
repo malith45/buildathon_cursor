@@ -36,9 +36,8 @@ export default function ProfileDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm transition-opacity duration-200 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className={`fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
         onClick={() => onOpenChange(false)}
         aria-hidden
       />
@@ -47,9 +46,8 @@ export default function ProfileDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Health profile"
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${open ? "translate-x-0" : "translate-x-full"
+          }`}
       >
         <div className="flex items-center justify-between border-b border-line/60 bg-card px-5 py-4">
           <div className="flex items-center gap-2.5">

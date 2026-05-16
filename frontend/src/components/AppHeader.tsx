@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { APP_NAME } from "@/lib/brand";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Activity, LogOut, User } from "lucide-react";
 
 const NAV = [
@@ -63,7 +64,8 @@ export default function AppHeader() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <ThemeToggle />
           {loading ? null : user ? (
             <>
               <span className="hidden max-w-[140px] truncate text-xs text-muted-foreground sm:inline">

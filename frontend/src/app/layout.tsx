@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ShieldAlert } from "lucide-react";
 import Providers from "@/components/Providers";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
 import "./globals.css";
@@ -28,7 +29,6 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
-      style={{ colorScheme: "light" }}
       suppressHydrationWarning
     >
       <body
@@ -48,8 +48,26 @@ export default function RootLayout({
           aria-hidden
         />
         <Providers>{children}</Providers>
-        <footer className="mt-auto border-t bg-card/50 px-4 py-5 text-center text-xs text-muted-foreground backdrop-blur-sm">
-          {APP_NAME} · Educational use only · OpenAI runs on the backend only
+        <footer className="mt-auto border-t border-line/60 bg-card/40 px-4 py-3 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-[1500px] flex-col items-center gap-1 text-center text-[11px] leading-relaxed">
+            <p className="flex items-center gap-1.5 text-muted-foreground">
+              <ShieldAlert
+                className="size-3 shrink-0 text-lavender"
+                aria-hidden
+              />
+              <span>
+                <span className="font-medium text-foreground/80">
+                  Not medical advice.
+                </span>{" "}
+                In an emergency, call your local emergency number.
+              </span>
+            </p>
+            <p className="text-muted-foreground/70">
+              {APP_NAME} · Built by team{" "}
+              <span className="font-medium text-foreground/70">Mcee</span> ·
+              Educational use only
+            </p>
+          </div>
         </footer>
       </body>
     </html>

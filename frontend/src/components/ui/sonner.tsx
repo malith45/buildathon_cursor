@@ -7,12 +7,14 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 export function Toaster({ ...props }: ToasterProps) {
+  const { resolvedTheme } = useTheme();
   return (
     <Sonner
-      theme="light"
+      theme={(resolvedTheme as "light" | "dark") ?? "light"}
       position="top-right"
       closeButton
       richColors

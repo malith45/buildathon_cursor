@@ -199,11 +199,13 @@ export default function TriageCard({ decision, loading }: Props) {
 
       <CardContent className="space-y-5 py-5">
         {decision.fallback && (
-          <div className="animate-fade-in flex gap-2 rounded-lg border border-amber-300/50 bg-amber-50/60 p-3 text-xs leading-relaxed">
-            <Info className="mt-0.5 size-3.5 shrink-0 text-amber-700" />
+          <div className="animate-fade-in flex gap-2 rounded-lg border border-amber-300/50 bg-amber-50/60 p-3 text-xs leading-relaxed dark:border-amber-500/30 dark:bg-amber-500/10">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
-              <p className="font-semibold text-amber-900">Fallback response</p>
-              <p className="mt-0.5 text-amber-800">
+              <p className="font-semibold text-amber-900 dark:text-amber-200">
+                Fallback response
+              </p>
+              <p className="mt-0.5 text-amber-800 dark:text-amber-300/90">
                 We used safe fallback guidance. Please consult a clinician.
               </p>
             </div>

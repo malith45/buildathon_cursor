@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Chat from "@/components/Chat";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import TriageCard from "@/components/TriageCard";
@@ -266,8 +265,6 @@ export default function HomeClient() {
           )}
         </div>
       </div>
-
-      <DisclaimerBanner />
 
       <ProfileDrawer
         open={profileOpen}

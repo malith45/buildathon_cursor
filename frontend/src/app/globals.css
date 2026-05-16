@@ -93,14 +93,77 @@
   --sidebar-accent-foreground: #2b2f36;
   --sidebar-border: #e0dbd2;
   --sidebar-ring: #5b6cff;
+  --color-line: #e0dbd2;
+  --shadow-card: 0 4px 24px rgba(43, 47, 54, 0.06);
+  /* Body backdrop gradients — overridden in .dark */
+  --bg-grad-1: rgba(91, 108, 255, 0.06);
+  --bg-grad-2: rgba(62, 214, 160, 0.07);
+  --bg-grad-3: rgba(183, 166, 255, 0.05);
+}
+
+.dark {
+  /* Surfaces — desaturated near-black with subtle warm tint, premium "OLED-ish" */
+  --background: #0e1014;
+  --foreground: #e8ecf2;
+  --card: #161a21;
+  --card-foreground: #e8ecf2;
+  --popover: #1a1f27;
+  --popover-foreground: #e8ecf2;
+
+  /* Brand colors slightly brightened for dark backgrounds */
+  --primary: #7a87ff;
+  --primary-foreground: #0e1014;
+  --secondary: #1c2a25;
+  --secondary-foreground: #e8ecf2;
+  --muted: #1d222b;
+  --muted-foreground: #9aa3b2;
+  --accent: #221d33;
+  --accent-foreground: #e8ecf2;
+  --destructive: #ff8585;
+
+  /* Hairlines — slightly visible on dark surfaces */
+  --border: #262c36;
+  --input: #262c36;
+  --ring: #7a87ff;
+
+  --chart-1: #7a87ff;
+  --chart-2: #5ae0b3;
+  --chart-3: #c8baff;
+  --chart-4: #ff8585;
+  --chart-5: #9aa3b2;
+
+  --sidebar: #0e1014;
+  --sidebar-foreground: #e8ecf2;
+  --sidebar-primary: #7a87ff;
+  --sidebar-primary-foreground: #0e1014;
+  --sidebar-accent: #1d222b;
+  --sidebar-accent-foreground: #e8ecf2;
+  --sidebar-border: #262c36;
+  --sidebar-ring: #7a87ff;
+
+  --color-line: #262c36;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.45);
+
+  /* More muted gradients on dark — keeps colour without washing out the depth */
+  --bg-grad-1: rgba(122, 135, 255, 0.08);
+  --bg-grad-2: rgba(90, 224, 179, 0.06);
+  --bg-grad-3: rgba(200, 186, 255, 0.05);
 }
 
 html {
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 ::selection {
   background-color: rgba(183, 166, 255, 0.45);
+}
+
+.dark ::selection {
+  background-color: rgba(122, 135, 255, 0.45);
 }
 
 @layer base {
@@ -110,9 +173,9 @@ html {
   body {
     @apply min-h-full bg-background font-sans text-foreground antialiased;
     background-image:
-      radial-gradient(at 8% 0%, rgba(91, 108, 255, 0.06) 0px, transparent 45%),
-      radial-gradient(at 92% 10%, rgba(62, 214, 160, 0.07) 0px, transparent 45%),
-      radial-gradient(at 50% 100%, rgba(183, 166, 255, 0.05) 0px, transparent 50%);
+      radial-gradient(at 8% 0%, var(--bg-grad-1) 0px, transparent 45%),
+      radial-gradient(at 92% 10%, var(--bg-grad-2) 0px, transparent 45%),
+      radial-gradient(at 50% 100%, var(--bg-grad-3) 0px, transparent 50%);
     background-attachment: fixed;
   }
   html {
