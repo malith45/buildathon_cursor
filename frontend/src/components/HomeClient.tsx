@@ -122,41 +122,87 @@ export default function HomeClient() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-teal-800 dark:text-teal-300">
-          AI Health &amp; Care Decision System
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Powered by Gemini on the backend — triage guidance, care steps, and
-          health education.
-        </p>
+    <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="overflow-hidden rounded-2xl border border-line/70 bg-white p-6 shadow-[var(--shadow-card)] sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+              <span className="h-1.5 w-1.5 rounded-full bg-mint" aria-hidden />
+              Calm Wellness · AI guidance
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+              Health &amp; Care Decision System
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-stone">
+              Thoughtful triage guidance, care steps, and education — powered by
+              Gemini on a secure backend.
+            </p>
+          </div>
+          <div
+            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
+              backendOk === false
+                ? "border-coral/40 bg-coral/10 text-coral"
+                : backendOk === true
+                  ? "border-mint/40 bg-mint/10 text-ink"
+                  : "border-line bg-sand text-stone"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                backendOk === false
+                  ? "bg-coral"
+                  : backendOk === true
+                    ? "bg-mint"
+                    : "animate-pulse bg-stone/40"
+              }`}
+            />
+            {backendOk === false
+              ? "Backend offline"
+              : backendOk === true
+                ? "Connected"
+                : "Checking…"}
+          </div>
+        </div>
+
         {backendOk === false && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-            Backend unreachable. Start the server:{" "}
-            <code className="text-xs">cd backend &amp;&amp; npm run dev</code>
+          <p className="mt-4 rounded-xl border border-coral/30 bg-coral/10 px-4 py-3 text-sm text-ink">
+            Start the API:{" "}
+            <code className="rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-xs">
+              cd backend &amp;&amp; npm run dev
+            </code>
           </p>
         )}
-        <DisclaimerBanner />
+
+        <div className="mt-5">
+          <DisclaimerBanner />
+        </div>
       </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-6 xl:grid-cols-[220px_280px_1fr_320px]">
-        <SessionList
-          sessions={sessions}
-          activeId={activeId}
-          onSelect={selectSession}
-          onNew={startNewSession}
-          onClear={handleClearHistory}
-        />
-        <HealthProfileForm profile={profile} onChange={persistProfile} />
-        <Chat
-          messages={messages}
-          onSend={handleSend}
-          loading={loading}
-          error={error}
-        />
-        <TriageCard decision={decision} loading={loading} />
+      <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5">
+        <div className="lg:col-span-2">
+          <SessionList
+            sessions={sessions}
+            activeId={activeId}
+            onSelect={selectSession}
+            onNew={startNewSession}
+            onClear={handleClearHistory}
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <HealthProfileForm profile={profile} onChange={persistProfile} />
+        </div>
+        <div className="lg:col-span-4">
+          <Chat
+            messages={messages}
+            onSend={handleSend}
+            loading={loading}
+            error={error}
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <TriageCard decision={decision} loading={loading} />
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

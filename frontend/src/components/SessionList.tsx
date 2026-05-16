@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatSession } from "@/lib/types";
+import { btnGhost, btnPrimarySm, card, cardHeader, sectionSubtitle, sectionTitle } from "@/lib/ui";
 
 interface Props {
   sessions: ChatSession[];
@@ -18,33 +19,32 @@ export default function SessionList({
   onClear,
 }: Props) {
   return (
-    <aside className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold">History</h2>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onNew}
-            className="rounded-md bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-700"
-          >
+    <aside className={`${card} flex max-h-[520px] flex-col lg:max-h-none lg:min-h-[480px]`}>
+      <div className={`${cardHeader} flex items-center justify-between gap-2`}>
+        <div>
+          <p className={sectionSubtitle}>Chats</p>
+          <h2 className={sectionTitle}>History</h2>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <button type="button" onClick={onNew} className={btnPrimarySm}>
             New
           </button>
           {sessions.length > 0 && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-zinc-800"
-            >
+            <button type="button" onClick={onClear} className={btnGhost}>
               Clear
             </button>
           )}
         </div>
       </div>
 
-      <ul className="flex-1 overflow-y-auto p-2">
+      <ul className="flex-1 space-y-1 overflow-y-auto p-3">
         {sessions.length === 0 ? (
-          <li className="px-2 py-4 text-center text-xs text-zinc-500">
-            No saved chats yet
+          <li className="rounded-xl bg-sand/80 px-4 py-8 text-center">
+            <p className="text-xs leading-relaxed text-stone">
+              No saved chats yet.
+              <br />
+              Start a conversation to see history here.
+            </p>
           </li>
         ) : (
           sessions.map((s) => (
@@ -52,14 +52,14 @@ export default function SessionList({
               <button
                 type="button"
                 onClick={() => onSelect(s.id)}
-                className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm transition ${
                   activeId === s.id
-                    ? "bg-teal-100 text-teal-900 dark:bg-teal-900/40 dark:text-teal-100"
-                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    ? "bg-brand/10 text-ink ring-2 ring-brand/25"
+                    : "text-ink hover:bg-canvas"
                 }`}
               >
                 <span className="line-clamp-2 font-medium">{s.title}</span>
-                <span className="mt-1 block text-xs text-zinc-500">
+                <span className="mt-1 block text-xs text-stone">
                   {new Date(s.updatedAt).toLocaleString()}
                 </span>
               </button>

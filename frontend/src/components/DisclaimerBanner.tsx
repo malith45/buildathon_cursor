@@ -2,11 +2,12 @@ export default function DisclaimerBanner() {
   return (
     <div
       role="note"
-      className="rounded-lg border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-700/40 dark:bg-amber-950/40 dark:text-amber-100"
+      className="rounded-xl border border-lavender/40 bg-lavender/15 px-4 py-3 text-sm leading-relaxed text-ink"
+      style={{ borderLeft: "4px solid #b7a6ff" }}
     >
-      <strong>Not medical advice.</strong> This tool does not replace a
-      doctor. If you think it is an emergency, call your local emergency
-      number immediately.
+      <strong className="font-semibold text-ink">Not medical advice.</strong>{" "}
+      This tool does not replace a doctor. If you think it is an emergency, call
+      your local emergency number immediately.
     </div>
   );
 }

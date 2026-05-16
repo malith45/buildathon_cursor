@@ -1,6 +1,7 @@
 "use client";
 
 import { HealthProfile } from "@/lib/types";
+import { card, input, sectionSubtitle, sectionTitle } from "@/lib/ui";
 
 interface Props {
   profile: HealthProfile;
@@ -22,15 +23,21 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
     onChange({ ...profile, ...partial });
 
   return (
-    <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="text-lg font-semibold">Health profile</h2>
+    <section className={`${card} space-y-4 p-5`}>
+      <div className="border-b border-line/60 pb-4">
+        <p className={sectionSubtitle}>Context</p>
+        <h2 className={sectionTitle}>Health profile</h2>
+        <p className="mt-1 text-xs text-stone">
+          Helps tailor guidance to you.
+        </p>
+      </div>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
+        <span className="mb-1.5 block text-xs font-medium text-stone">
           Age range
         </span>
         <select
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+          className={input}
           value={profile.ageRange}
           onChange={(e) => update({ ageRange: e.target.value })}
         >
@@ -43,11 +50,11 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
+        <span className="mb-1.5 block text-xs font-medium text-stone">
           Sex (optional)
         </span>
         <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+          className={input}
           value={profile.sex ?? ""}
           onChange={(e) => update({ sex: e.target.value || undefined })}
           placeholder="e.g. female, male"
@@ -55,11 +62,11 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Chronic conditions (comma-separated)
+        <span className="mb-1.5 block text-xs font-medium text-stone">
+          Chronic conditions
         </span>
         <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+          className={input}
           value={profile.conditions.join(", ")}
           onChange={(e) =>
             update({
@@ -74,11 +81,11 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Allergies (comma-separated)
+        <span className="mb-1.5 block text-xs font-medium text-stone">
+          Allergies
         </span>
         <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+          className={input}
           value={profile.allergies.join(", ")}
           onChange={(e) =>
             update({
@@ -93,11 +100,11 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Medications (free text)
+        <span className="mb-1.5 block text-xs font-medium text-stone">
+          Medications
         </span>
         <textarea
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+          className={input}
           rows={2}
           value={profile.medications}
           onChange={(e) => update({ medications: e.target.value })}
@@ -105,9 +112,10 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
         />
       </label>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line/60 bg-canvas px-3 py-2.5 text-sm">
         <input
           type="checkbox"
+          className="h-4 w-4 rounded border-line text-brand accent-[#5b6cff]"
           checked={!!profile.pregnant}
           onChange={(e) => update({ pregnant: e.target.checked })}
         />
