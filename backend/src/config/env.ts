@@ -6,6 +6,8 @@ export const env = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
   PORT: parseInt(process.env.PORT ?? "4000", 10),
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+  AUTH_SECRET:
+    process.env.AUTH_SECRET ?? "dev-only-change-in-production-buildathon",
 };
 
 export function assertGeminiKey(): void {

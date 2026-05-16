@@ -23,12 +23,16 @@ import {
   HealthDecisionResponse,
   HealthProfile,
 } from "@/lib/types";
+import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export default function HomeClient() {
+  const { user, loading: authLoading, updateHealthProfile } = useAuth();
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -38,23 +42,48 @@ export default function HomeClient() {
   const [error, setError] = useState<string | null>(null);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
+  const userId = user?.id ?? null;
+
   useEffect(() => {
-    setProfile(loadProfile());
-    setSessions(loadSessions());
     checkBackendHealth().then(setBackendOk);
   }, []);
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (user) {
+      setProfile(user.healthProfile);
+      setSessions(loadSessions(user.id));
+    } else {
+      setProfile(loadProfile());
+      setSessions(loadSessions());
+    }
+    setActiveId(null);
+    setMessages([]);
+    setDecision(null);
+  }, [user, authLoading]);
+
   const activeSession = sessions.find((s) => s.id === activeId) ?? null;
 
-  const persistProfile = useCallback((next: HealthProfile) => {
-    setProfile(next);
-    saveProfile(next);
-  }, []);
+  const persistProfile = useCallback(
+    (next: HealthProfile) => {
+      setProfile(next);
+      saveProfile(next, userId);
+      if (user) {
+        void updateHealthProfile(next).catch(() => {
+          /* keep local state; user can save from /profile */
+        });
+      }
+    },
+    [user, userId, updateHealthProfile]
+  );
 
-  const persistSessions = useCallback((next: ChatSession[]) => {
-    setSessions(next);
-    saveSessions(next);
-  }, []);
+  const persistSessions = useCallback(
+    (next: ChatSession[]) => {
+      setSessions(next);
+      saveSessions(next, userId);
+    },
+    [userId]
+  );
 
   const selectSession = useCallback(
     (id: string) => {
@@ -76,10 +105,10 @@ export default function HomeClient() {
   }, []);
 
   const handleClearHistory = useCallback(() => {
-    clearAllSessions();
+    clearAllSessions(userId);
     setSessions([]);
     startNewSession();
-  }, [startNewSession]);
+  }, [startNewSession, userId]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -183,6 +212,32 @@ export default function HomeClient() {
           )}
 
           <DisclaimerBanner />
+
+          {!authLoading && !user && (
+            <Alert className="border-primary/30 bg-primary/5">
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  Log in to save your health profile and chat history to your
+                  account.
+                </span>
+                <Link href="/login" className={buttonVariants({ size: "sm" })}>
+                  Log in
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {user && (
+            <Alert className="border-mint/30 bg-mint/10">
+              <AlertDescription>
+                Signed in as <strong>{user.name}</strong>. Profile changes sync
+                to your account.{" "}
+                <Link href="/profile" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Edit profile
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

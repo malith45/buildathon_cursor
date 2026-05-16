@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 interface Props {
   profile: HealthProfile;
   onChange: (profile: HealthProfile) => void;
+  /** When true, renders fields only (no outer Card) — for /profile page */
+  embedded?: boolean;
 }
 
 const AGE_RANGES = [
@@ -30,18 +32,25 @@ const AGE_RANGES = [
   "65+",
 ];
 
-export default function HealthProfileForm({ profile, onChange }: Props) {
+const SEX_UNSPECIFIED = "unspecified";
+
+const SEX_OPTIONS = [
+  { value: SEX_UNSPECIFIED, label: "Prefer not to say" },
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "other", label: "Other" },
+] as const;
+
+export default function HealthProfileForm({
+  profile,
+  onChange,
+  embedded = false,
+}: Props) {
   const update = (partial: Partial<HealthProfile>) =>
     onChange({ ...profile, ...partial });
 
-  return (
-    <Card className="shadow-[var(--shadow-card)]">
-      <CardHeader className="border-b">
-        <p className={sectionSubtitle}>Context</p>
-        <CardTitle className={sectionTitle}>Health profile</CardTitle>
-        <CardDescription>Helps tailor guidance to you.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const fields = (
+    <>
         <div className="space-y-2">
           <Label htmlFor="age-range">Age range</Label>
           <Select
@@ -65,12 +74,31 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
 
         <div className="space-y-2">
           <Label htmlFor="sex">Sex (optional)</Label>
-          <Input
-            id="sex"
-            value={profile.sex ?? ""}
-            onChange={(e) => update({ sex: e.target.value || undefined })}
-            placeholder="e.g. female, male"
-          />
+          <Select
+            value={
+              profile.sex &&
+              SEX_OPTIONS.some((o) => o.value === profile.sex)
+                ? profile.sex
+                : SEX_UNSPECIFIED
+            }
+            onValueChange={(value) => {
+              if (!value) return;
+              update({
+                sex: value === SEX_UNSPECIFIED ? undefined : value,
+              });
+            }}
+          >
+            <SelectTrigger id="sex" className="w-full">
+              <SelectValue placeholder="Select sex" />
+            </SelectTrigger>
+            <SelectContent>
+              {SEX_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
@@ -130,7 +158,29 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
             Currently pregnant
           </Label>
         </div>
-      </CardContent>
+    </>
+  );
+
+  const header = embedded ? (
+    <>
+      <p className={sectionSubtitle}>Health</p>
+      <CardTitle className={sectionTitle}>Health profile</CardTitle>
+      <CardDescription>
+        Used when you request care guidance on the consult screen.
+      </CardDescription>
+    </>
+  ) : (
+    <>
+      <p className={sectionSubtitle}>Context</p>
+      <CardTitle className={sectionTitle}>Health profile</CardTitle>
+      <CardDescription>Helps tailor guidance to you.</CardDescription>
+    </>
+  );
+
+  return (
+    <Card className="shadow-[var(--shadow-card)]">
+      <CardHeader className="border-b">{header}</CardHeader>
+      <CardContent className="space-y-4">{fields}</CardContent>
     </Card>
   );
 }

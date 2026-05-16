@@ -43,6 +43,19 @@ export interface DecisionRequest {
   messages: ChatMessage[];
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  healthProfile: HealthProfile;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
 export const DEFAULT_PROFILE: HealthProfile = {
   ageRange: "25-34",
   conditions: [],
