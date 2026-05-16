@@ -2,7 +2,7 @@
 
 import { ChatMessage } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -110,77 +110,112 @@ export default function Chat({ messages, onSend, loading }: Props) {
 
   const isEmpty = messages.length === 0;
 
-  return (
-    <Card className="relative flex h-full min-h-[480px] flex-col overflow-hidden border-line/70 bg-card/95 shadow-(--shadow-card)">
-      <div className="flex shrink-0 items-center gap-3 border-b border-line/60 bg-linear-to-r from-primary/4 via-transparent to-mint/4 px-5 py-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary to-lavender text-primary-foreground shadow-sm">
-          <Bot className="size-4.5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-heading text-sm font-semibold leading-tight">
-            MediAssist
-          </p>
-          <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="relative flex size-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-mint" />
-            </span>
-            Powered by OpenAI · Educational guidance only
-          </p>
-        </div>
+  const composer = (
+    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-2xl">
+      <div className="group/composer flex items-end gap-2 rounded-2xl border border-line/70 bg-background p-1.5 shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/15">
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+          rows={1}
+          placeholder="Describe your symptoms…"
+          className="min-h-9 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-sm leading-5 shadow-none outline-none focus-visible:ring-0"
+          style={{ boxShadow: "none" }}
+        />
+        <Button
+          type="submit"
+          disabled={loading || !value.trim()}
+          size="icon-lg"
+          className="size-9 shrink-0 rounded-xl shadow-sm"
+          aria-label="Send"
+        >
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Send className="size-4" />
+          )}
+        </Button>
       </div>
+      <p className="mt-1.5 flex items-center justify-center gap-1.5 px-1 text-[11px] leading-snug text-muted-foreground">
+        <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
+          Enter
+        </kbd>
+        to send
+        <span className="text-muted-foreground/50">·</span>
+        <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
+          Shift + Enter
+        </kbd>
+        new line
+      </p>
+    </form>
+  );
 
-      <CardContent className="flex min-h-0 flex-1 flex-col px-0">
-        <div className="scrollbar-thin flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-6">
-            {isEmpty ? (
-              <div className="animate-fade-up py-4">
-                <div className="mb-6 flex flex-col items-center text-center">
-                  <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-linear-to-br from-primary/20 to-mint/20 text-primary ring-1 ring-primary/20">
-                    <Sparkles className="size-6" />
-                  </div>
-                  <h3 className="font-heading text-lg font-semibold tracking-tight">
-                    How are you feeling today?
-                  </h3>
-                  <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
-                    Describe your symptoms in your own words. The more context
-                    you share, the better the guidance.
-                  </p>
-                </div>
-
-                <p className="mb-3 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Try an example
-                </p>
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {STARTERS.map((s, idx) => {
-                    const Icon = s.icon;
-                    return (
-                      <button
-                        key={s.title}
-                        type="button"
-                        disabled={loading}
-                        onClick={() => onSend(s.text)}
-                        style={{ animationDelay: `${idx * 60}ms` }}
-                        className="group/starter animate-fade-up flex items-start gap-3 rounded-xl border border-line/60 bg-card/50 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-                      >
-                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
-                          <Icon className="size-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-tight">
-                            {s.title}
-                          </p>
-                          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
-                            {s.detail}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+  return (
+    <Card className="relative flex h-full min-h-[360px] flex-col overflow-hidden border-line/70 bg-card/95">
+      {isEmpty ? (
+        /* Empty state — hero + starters + composer as one cohesive centered block */
+        <div className="scrollbar-thin flex flex-1 items-center justify-center overflow-y-auto px-5 py-6">
+          <div className="w-full max-w-2xl space-y-6">
+            <div className="animate-fade-up flex flex-col items-center text-center">
+              <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary/20 to-mint/20 text-primary ring-1 ring-primary/20">
+                <Sparkles className="size-5" />
               </div>
-            ) : (
-              messages.map((m, i) => (
+              <h3 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+                How are you feeling today?
+              </h3>
+              <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+                Describe your symptoms in your own words — the more context, the
+                better the guidance.
+              </p>
+            </div>
+
+            <div
+              className="animate-fade-up"
+              style={{ animationDelay: "60ms" }}
+            >
+              {composer}
+            </div>
+
+            <div
+              className="animate-fade-up grid gap-2 sm:grid-cols-2"
+              style={{ animationDelay: "120ms" }}
+            >
+              {STARTERS.map((s, idx) => {
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.title}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => onSend(s.text)}
+                    style={{ animationDelay: `${160 + idx * 40}ms` }}
+                    className="group/starter animate-fade-up flex items-start gap-2.5 rounded-xl border border-line/60 bg-card/50 p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                  >
+                    <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
+                      <Icon className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium leading-tight">
+                        {s.title}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                        {s.detail}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Conversation — scrollable messages with composer pinned to the bottom */
+        <>
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-5">
+              {messages.map((m, i) => (
                 <div
                   key={i}
                   className={cn(
@@ -200,65 +235,28 @@ export default function Chat({ messages, onSend, loading }: Props) {
                     {m.text}
                   </div>
                 </div>
-              ))
-            )}
+              ))}
 
-            {loading && (
-              <div className="animate-fade-in flex gap-3">
-                <Avatar role="model" />
-                <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-line/60 bg-card px-4 py-3 text-muted-foreground shadow-sm">
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
+              {loading && (
+                <div className="animate-fade-in flex gap-3">
+                  <Avatar role="model" />
+                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-line/60 bg-card px-4 py-3 text-muted-foreground shadow-sm">
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={bottomRef} />
-          </div>
-        </div>
-
-        <div className="shrink-0 border-t border-line/60 bg-card/95 px-5 py-4 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
-            <div className="group/composer flex items-end gap-2 rounded-2xl border border-line/70 bg-background p-1.5 shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/15">
-              <Textarea
-                ref={textareaRef}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={loading}
-                rows={1}
-                placeholder="Describe your symptoms…"
-                className="min-h-9 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-sm leading-5 shadow-none outline-none focus-visible:ring-0"
-                style={{ boxShadow: "none" }}
-              />
-              <Button
-                type="submit"
-                disabled={loading || !value.trim()}
-                size="icon-lg"
-                className="size-9 shrink-0 rounded-xl shadow-sm"
-                aria-label="Send"
-              >
-                {loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Send className="size-4" />
-                )}
-              </Button>
+              <div ref={bottomRef} />
             </div>
-            <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-              <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
-                Enter
-              </kbd>{" "}
-              to send,{" "}
-              <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
-                Shift + Enter
-              </kbd>{" "}
-              for a new line · Not a substitute for medical advice
-            </p>
-          </form>
-        </div>
-      </CardContent>
+          </div>
+
+          <div className="shrink-0 border-t border-line/60 bg-card/95 px-5 py-3 backdrop-blur-sm">
+            {composer}
+          </div>
+        </>
+      )}
     </Card>
   );
 }

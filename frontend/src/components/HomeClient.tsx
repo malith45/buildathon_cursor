@@ -12,7 +12,6 @@ import {
   fetchChatSessions,
   syncChatSessions,
 } from "@/lib/chats-api";
-import SystemStatusPanel from "@/components/SystemStatusPanel";
 import {
   createSession,
   loadSessions,
@@ -31,9 +30,7 @@ import {
 } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage, toast } from "@/lib/toast";
-import { Button, buttonVariants } from "@/components/ui/button";
-import Link from "next/link";
-import { ChevronRight, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function HomeClient() {
   const { user, loading: authLoading, updateHealthProfile } = useAuth();
@@ -44,7 +41,6 @@ export default function HomeClient() {
   const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [showSignInPrompt, setShowSignInPrompt] = useState(true);
   const userId = user?.id ?? null;
 
   useEffect(() => {
@@ -220,6 +216,8 @@ export default function HomeClient() {
     [activeSession, messages, profile, sessions, persistSessions]
   );
 
+  const showTriage = Boolean(decision) || (loading && messages.length > 0);
+
   const profileSummary = useMemo(() => {
     const parts: string[] = [profile.ageRange];
     if (profile.sex) parts.push(profile.sex);
@@ -232,41 +230,9 @@ export default function HomeClient() {
   }, [profile]);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-      {/* System status: full-width row aligned to the right */}
-      <section className="flex w-full justify-end">
-        <SystemStatusPanel />
-      </section>
-
-      {/* Sign-in prompt for guests (dismissible) */}
-      {!authLoading && !user && showSignInPrompt && (
-        <div className="animate-fade-in flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/4 px-4 py-2.5">
-          <p className="text-xs leading-relaxed text-foreground/80">
-            <span className="font-medium">Sign in</span> to save your health
-            profile and chat history across devices.
-          </p>
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/login"
-              className={buttonVariants({ size: "sm", variant: "default" })}
-            >
-              Log in
-              <ChevronRight className="size-3.5" />
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setShowSignInPrompt(false)}
-              aria-label="Dismiss"
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Workspace shell */}
-      <div className="flex min-h-[640px] flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/70 shadow-(--shadow-card) backdrop-blur-sm">
+    <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5 lg:px-8 md:min-h-[calc(100vh-3.5rem)]">
+      {/* Workspace shell — flex-1 fills available viewport, min-h floor keeps it usable on tiny screens */}
+      <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm">
         <ChatHistorySidebar
           sessions={sessions}
           activeId={activeId}
@@ -278,17 +244,26 @@ export default function HomeClient() {
           onOpenProfile={() => setProfileOpen(true)}
         />
 
-        <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex min-w-0 flex-col">
+        <div
+          className={cn(
+            "grid min-h-0 min-w-0 flex-1 gap-4 p-3 sm:p-4",
+            showTriage
+              ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px]"
+              : "grid-cols-1"
+          )}
+        >
+          <div className="flex min-h-0 min-w-0 flex-col">
             <Chat
               messages={messages}
               onSend={handleSend}
               loading={loading}
             />
           </div>
-          <aside className="flex min-w-0 flex-col">
-            <TriageCard decision={decision} loading={loading} />
-          </aside>
+          {showTriage && (
+            <aside className="scrollbar-thin animate-fade-in flex min-h-0 min-w-0 flex-col overflow-y-auto">
+              <TriageCard decision={decision} loading={loading} />
+            </aside>
+          )}
         </div>
       </div>
 

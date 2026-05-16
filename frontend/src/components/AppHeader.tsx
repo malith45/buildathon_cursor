@@ -30,7 +30,7 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/60 bg-card/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
           className="group/logo flex items-center gap-2.5 font-heading text-sm font-semibold text-foreground"
@@ -41,7 +41,7 @@ export default function AppHeader() {
           <span className="hidden sm:inline">{APP_NAME}</span>
         </Link>
 
-        <nav className="flex items-center gap-1">
+        <nav className="ml-2 flex items-center gap-1">
           {NAV.map((item) => {
             if ("auth" in item && item.auth && !user) return null;
             const active = pathname === item.href;
@@ -63,7 +63,7 @@ export default function AppHeader() {
           })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           {loading ? null : user ? (
             <>
               <span className="hidden max-w-[140px] truncate text-xs text-muted-foreground sm:inline">
