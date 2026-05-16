@@ -5,16 +5,36 @@ import {
   URGENCY_LABELS,
   UrgencyLevel,
 } from "@/lib/types";
+import { sectionSubtitle, sectionTitle } from "@/lib/ui";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { Sparkles } from "lucide-react";
 
-const URGENCY_STYLES: Record<UrgencyLevel, string> = {
-  self_care:
-    "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-100 dark:border-emerald-800",
+const URGENCY_VARIANT: Record<
+  UrgencyLevel,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  self_care: "secondary",
+  see_doctor_soon: "outline",
+  urgent_care: "default",
+  emergency: "destructive",
+};
+
+const URGENCY_CLASS: Record<UrgencyLevel, string> = {
+  self_care: "border-mint/50 bg-mint/15 text-foreground hover:bg-mint/15",
   see_doctor_soon:
-    "bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-100 dark:border-yellow-800",
-  urgent_care:
-    "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950 dark:text-orange-100 dark:border-orange-800",
-  emergency:
-    "bg-red-100 text-red-900 border-red-300 dark:bg-red-950 dark:text-red-100 dark:border-red-800",
+    "border-lavender/50 bg-lavender/20 text-foreground hover:bg-lavender/20",
+  urgent_care: "bg-primary/90",
+  emergency: "bg-destructive/15 text-destructive hover:bg-destructive/15",
 };
 
 interface Props {
@@ -22,84 +42,131 @@ interface Props {
   loading?: boolean;
 }
 
+function LoadingSkeleton() {
+  return (
+    <Card className="shadow-[var(--shadow-card)]">
+      <CardContent className="space-y-3 pt-6">
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+        <Skeleton className="h-3 w-4/6" />
+        <p className="pt-2 text-sm text-muted-foreground">
+          Analyzing your symptoms…
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TriageCard({ decision, loading }: Props) {
-  if (loading) {
-    return (
-      <section className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-zinc-500">Analyzing your symptoms…</p>
-      </section>
-    );
+  if (loading && !decision) {
+    return <LoadingSkeleton />;
   }
 
   if (!decision) {
     return (
-      <section className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/50">
-        <p className="text-sm text-zinc-500">
-          Send a message to receive triage guidance.
-        </p>
-      </section>
+      <Card className="flex min-h-[200px] flex-col items-center justify-center border-dashed bg-gradient-to-br from-card to-muted/50 text-center shadow-[var(--shadow-card)]">
+        <CardContent className="flex flex-col items-center py-10">
+          <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Sparkles className="size-6" />
+          </div>
+          <CardTitle className="text-sm">Care decision</CardTitle>
+          <CardDescription className="mt-1 max-w-[200px]">
+            Send a message to receive personalized triage guidance.
+          </CardDescription>
+        </CardContent>
+      </Card>
     );
   }
 
-  const badgeClass = URGENCY_STYLES[decision.urgency];
-
   return (
-    <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Care decision</h2>
-        <span
-          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeClass}`}
+    <Card className="shadow-[var(--shadow-card)]">
+      <CardHeader className="flex-row items-start justify-between gap-2 border-b">
+        <div>
+          <p className={sectionSubtitle}>Guidance</p>
+          <CardTitle className={sectionTitle}>Care decision</CardTitle>
+        </div>
+        <Badge
+          className={cn(
+            "shrink-0 uppercase tracking-wide",
+            URGENCY_CLASS[decision.urgency]
+          )}
+          variant={URGENCY_VARIANT[decision.urgency]}
         >
           {URGENCY_LABELS[decision.urgency]}
-        </span>
-      </div>
+        </Badge>
+      </CardHeader>
 
-      {decision.fallback && (
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          We used a safe fallback response. Please consult a clinician.
+      <CardContent className="space-y-4">
+        {decision.fallback && (
+          <Alert>
+            <AlertTitle>Fallback response</AlertTitle>
+            <AlertDescription>
+              We used a safe fallback response. Please consult a clinician.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {decision.urgency === "emergency" && (
+          <Alert variant="destructive" className="border-coral/40 bg-coral/10">
+            <AlertTitle>Emergency</AlertTitle>
+            <AlertDescription>
+              If this feels life-threatening, call emergency services now.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <p className="text-sm leading-relaxed">{decision.summary}</p>
+
+        {decision.redFlags.length > 0 && (
+          <Alert variant="destructive" className="border-coral/30 bg-coral/5">
+            <AlertTitle className="text-destructive">Red flags</AlertTitle>
+            <AlertDescription>
+              <ul className="mt-2 space-y-1.5">
+                {decision.redFlags.map((item, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-destructive">•</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {decision.careSteps.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Suggested care steps
+            </h3>
+            <ul className="space-y-1.5 text-sm">
+              {decision.careSteps.map((item, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="font-semibold text-mint">{i + 1}.</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {decision.education.length > 0 && (
+          <div className="rounded-xl bg-muted/60 p-3">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Education
+            </h3>
+            <ul className="space-y-1.5 text-sm">
+              {decision.education.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+          {decision.disclaimer}
         </p>
-      )}
-
-      <p className="text-sm leading-relaxed">{decision.summary}</p>
-
-      {decision.redFlags.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-sm font-semibold text-red-700 dark:text-red-400">
-            Red flags
-          </h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {decision.redFlags.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {decision.careSteps.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-sm font-semibold">Suggested care steps</h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {decision.careSteps.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {decision.education.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-sm font-semibold">Education</h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {decision.education.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <p className="border-t border-zinc-200 pt-3 text-xs text-zinc-500 dark:border-zinc-700">
-        {decision.disclaimer}
-      </p>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

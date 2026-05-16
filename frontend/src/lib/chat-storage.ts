@@ -2,10 +2,14 @@ import { ChatMessage, ChatSession, HealthDecisionResponse } from "./types";
 
 const STORAGE_KEY = "healthcare_sessions";
 
-export function loadSessions(): ChatSession[] {
+function sessionsKey(userId?: string | null): string {
+  return userId ? `${STORAGE_KEY}_${userId}` : STORAGE_KEY;
+}
+
+export function loadSessions(userId?: string | null): ChatSession[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(sessionsKey(userId));
     if (!raw) return [];
     return JSON.parse(raw) as ChatSession[];
   } catch {
@@ -13,8 +17,11 @@ export function loadSessions(): ChatSession[] {
   }
 }
 
-export function saveSessions(sessions: ChatSession[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+export function saveSessions(
+  sessions: ChatSession[],
+  userId?: string | null
+): void {
+  localStorage.setItem(sessionsKey(userId), JSON.stringify(sessions));
 }
 
 export function createSession(firstMessage: string): ChatSession {
@@ -57,6 +64,6 @@ export function updateSessionMessages(
   };
 }
 
-export function clearAllSessions(): void {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearAllSessions(userId?: string | null): void {
+  localStorage.removeItem(sessionsKey(userId));
 }

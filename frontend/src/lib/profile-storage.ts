@@ -2,10 +2,14 @@ import { DEFAULT_PROFILE, HealthProfile } from "./types";
 
 const STORAGE_KEY = "healthcare_profile";
 
-export function loadProfile(): HealthProfile {
+function profileKey(userId?: string | null): string {
+  return userId ? `${STORAGE_KEY}_${userId}` : STORAGE_KEY;
+}
+
+export function loadProfile(userId?: string | null): HealthProfile {
   if (typeof window === "undefined") return DEFAULT_PROFILE;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(profileKey(userId));
     if (!raw) return DEFAULT_PROFILE;
     return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
   } catch {
@@ -13,10 +17,13 @@ export function loadProfile(): HealthProfile {
   }
 }
 
-export function saveProfile(profile: HealthProfile): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+export function saveProfile(
+  profile: HealthProfile,
+  userId?: string | null
+): void {
+  localStorage.setItem(profileKey(userId), JSON.stringify(profile));
 }
 
-export function clearProfile(): void {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearProfile(userId?: string | null): void {
+  localStorage.removeItem(profileKey(userId));
 }

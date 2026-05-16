@@ -1,3 +1,4 @@
+import { parseApiError } from "./api-error";
 import { DecisionRequest, HealthDecisionResponse } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -13,18 +14,42 @@ export async function postHealthDecision(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(
-      (data as { error?: string }).error ?? "Backend request failed"
-    );
+    throw new Error(parseApiError(data));
   }
 
   return res.json() as Promise<HealthDecisionResponse>;
 }
 
+export interface GeminiProbe {
+  configured: boolean;
+  working: boolean;
+  message: string;
+  model: string | null;
+  sample?: string | null;
+}
+
+export interface SystemHealth {
+  status: string;
+  geminiConfigured: boolean;
+  databaseConfigured?: boolean;
+  databaseConnected: boolean;
+  databaseMessage?: string | null;
+  gemini?: GeminiProbe;
+}
+
+export async function fetchSystemHealth(probe = false): Promise<SystemHealth> {
+  const url = probe ? `${BASE}/api/health?probe=true` : `${BASE}/api/health`;
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) {
+    throw new Error(`Health check failed (${res.status})`);
+  }
+  return res.json() as Promise<SystemHealth>;
+}
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}/api/health`, { method: "GET" });
-    return res.ok;
+    const health = await fetchSystemHealth(false);
+    return health.status === "ok";
   } catch {
     return false;
   }
