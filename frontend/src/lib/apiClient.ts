@@ -20,7 +20,7 @@ export async function postHealthDecision(
   return res.json() as Promise<HealthDecisionResponse>;
 }
 
-export interface GeminiProbe {
+export interface AiProbe {
   configured: boolean;
   working: boolean;
   message: string;
@@ -30,11 +30,14 @@ export interface GeminiProbe {
 
 export interface SystemHealth {
   status: string;
-  geminiConfigured: boolean;
-  databaseConfigured?: boolean;
-  databaseConnected: boolean;
-  databaseMessage?: string | null;
-  gemini?: GeminiProbe;
+  aiConfigured: boolean;
+  aiModel?: string;
+  storageConfigured?: boolean;
+  storageConnected: boolean;
+  storageMessage?: string | null;
+  storageBucket?: string | null;
+  diseasesReady?: boolean;
+  ai?: AiProbe;
 }
 
 export async function fetchSystemHealth(probe = false): Promise<SystemHealth> {

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { APP_NAME } from "@/lib/brand";
 import { Loader2 } from "lucide-react";
 
 export default function LoginForm() {
@@ -41,11 +42,11 @@ export default function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md shadow-[var(--shadow-card)]">
+    <Card className="w-full max-w-md shadow-(--shadow-card)">
       <CardHeader>
         <CardTitle className="font-heading text-xl">Welcome back</CardTitle>
         <CardDescription>
-          Log in to save your health profile and chat history.
+          Log in to {APP_NAME} to save your health profile and chat history.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>

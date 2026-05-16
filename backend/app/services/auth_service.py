@@ -2,10 +2,11 @@ from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 from app.config import get_settings
-from app.db import user_repository
 from app.schemas.auth import PublicUser
 from app.schemas.health import HealthProfile
 from app.security.passwords import hash_password, verify_password
+from app.storage import users_store
+from app.storage.errors import StorageConflict
 
 DEFAULT_HEALTH_PROFILE = HealthProfile(
     ageRange="25-34",
@@ -53,28 +54,31 @@ def verify_token(token: str) -> str:
 
 def signup(email: str, password: str, name: str) -> tuple[PublicUser, str]:
     normalized = email.strip().lower()
-    if user_repository.find_by_email(normalized):
+    if users_store.find_by_email(normalized):
         raise AuthError("An account with this email already exists", 409)
 
-    record = user_repository.insert_user(
-        email=normalized,
-        password_hash=hash_password(password),
-        name=name.strip(),
-        health_profile=DEFAULT_HEALTH_PROFILE.model_copy(),
-    )
+    try:
+        record = users_store.insert_user(
+            email=normalized,
+            password_hash=hash_password(password),
+            name=name.strip(),
+            health_profile=DEFAULT_HEALTH_PROFILE.model_copy(),
+        )
+    except StorageConflict as exc:
+        raise AuthError("An account with this email already exists", 409) from exc
     return _to_public(record), _sign_token(record["id"])
 
 
 def login(email: str, password: str) -> tuple[PublicUser, str]:
     normalized = email.strip().lower()
-    record = user_repository.find_by_email(normalized)
+    record = users_store.find_by_email(normalized)
     if not record or not verify_password(password, record["password_hash"]):
         raise AuthError("Invalid email or password", 401)
     return _to_public(record), _sign_token(record["id"])
 
 
 def get_user_by_id(user_id: str) -> PublicUser | None:
-    record = user_repository.find_by_id(user_id)
+    record = users_store.find_by_id(user_id)
     return _to_public(record) if record else None
 
 
@@ -84,16 +88,22 @@ def update_user_profile(
     name: str | None = None,
     health_profile: HealthProfile | None = None,
 ) -> PublicUser:
-    record = user_repository.update_user(
-        user_id,
-        name=name.strip() if name is not None else None,
-        health_profile=health_profile,
-    )
+    try:
+        record = users_store.update_user(
+            user_id,
+            name=name.strip() if name is not None else None,
+            health_profile=health_profile,
+        )
+    except StorageConflict as exc:
+        raise AuthError(
+            "Profile was modified elsewhere — please refresh and try again.",
+            409,
+        ) from exc
     if not record:
         raise AuthError("User not found", 404)
     return _to_public(record)
 
 
 def clear_users_for_tests() -> None:
-    """Reset store (tests only, requires database)."""
-    user_repository.clear_all_users()
+    """Reset store (tests only, requires GCS)."""
+    users_store.clear_all_users()

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import get_settings
-from app.db import disease_repository
+from app.storage import diseases_store
 
 router = APIRouter(prefix="/diseases", tags=["diseases"])
 
@@ -12,16 +12,16 @@ def list_diseases(
     limit: int = Query(20, ge=1, le=50),
 ) -> dict:
     settings = get_settings()
-    if not settings.database_configured:
+    if not settings.storage_configured:
         raise HTTPException(
             status_code=503,
-            detail="Disease catalog requires database configuration.",
+            detail="Disease catalog requires GCS_BUCKET configuration.",
         )
     try:
-        diseases = disease_repository.search_diseases(search, limit)
+        diseases = diseases_store.search_diseases(search, limit)
         return {"diseases": diseases}
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Could not load diseases from database.",
+            detail="Could not load diseases from storage.",
         ) from exc

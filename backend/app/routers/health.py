@@ -1,85 +1,75 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from app.config import assert_gemini_key, get_settings
-from app.db.connection import get_connection, init_schema, ping_database
-from app.db.errors import is_database_unavailable
+from app.config import assert_openai_key, get_settings
 from app.schemas.health import DecisionRequest, HealthDecisionResponse
-from app.services import gemini_service, health_decision_service
+from app.services import health_decision_service, openai_service
+from app.storage import client as storage_client
+from app.storage import diseases_store
+from app.storage.errors import is_storage_unavailable
 
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-def _database_status() -> tuple[bool, bool, str | None]:
+def _storage_status() -> tuple[bool, bool, str | None]:
     settings = get_settings()
-    if not settings.DATABASE_ENABLED:
-        return False, False, "Database disabled (DATABASE_ENABLED=false)"
-    if not settings.database_configured:
-        return False, False, "Set DATABASE_* variables in backend/.env"
+    if not settings.STORAGE_ENABLED:
+        return False, False, "Storage disabled (STORAGE_ENABLED=false)"
+    if not settings.storage_configured:
+        return False, False, "Set GCS_BUCKET in backend/.env"
     try:
-        ping_database()
+        storage_client.storage_ping()
         return True, True, None
     except Exception as exc:
         return True, False, str(exc)[:200]
 
 
-def _disease_table_ready() -> bool:
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT to_regclass('public.diseases')")
-                row = cur.fetchone()
-                if not row or row[0] is None:
-                    return False
-                cur.execute("SELECT COUNT(*) FROM public.diseases")
-                count_row = cur.fetchone()
-                return bool(count_row and int(count_row[0]) >= 1)
-    except Exception:
-        return False
-
-
-@router.post("/init-db")
-def post_init_db() -> dict:
-    """Create missing tables and seed diseases (local dev helper)."""
+@router.post("/init-storage")
+def post_init_storage() -> dict:
+    """Verify bucket access and seed the disease catalog (local dev helper)."""
     settings = get_settings()
-    if not settings.database_configured:
+    if not settings.storage_configured:
         raise HTTPException(
             status_code=503,
-            detail="DATABASE_* not configured in backend/.env",
+            detail="GCS_BUCKET not configured in backend/.env",
         )
     try:
-        init_schema()
+        storage_client.init_storage()
         return {
             "status": "ok",
-            "diseasesReady": _disease_table_ready(),
+            "diseasesReady": diseases_store.catalog_ready(),
         }
     except Exception as exc:
-        if is_database_unavailable(exc):
+        if is_storage_unavailable(exc):
             raise HTTPException(
                 status_code=503,
-                detail="Could not reach Supabase. Check pooler host, port 5432, and password.",
+                detail=storage_client.storage_health_hint(),
             ) from exc
         raise HTTPException(status_code=500, detail=str(exc)[:200]) from exc
 
 
 @router.get("")
-def health_check(probe: bool = Query(False, description="Run a live Gemini API test")) -> dict:
+def health_check(
+    probe: bool = Query(False, description="Run a live OpenAI API test"),
+) -> dict:
     settings = get_settings()
-    db_configured, db_connected, db_message = _database_status()
-    diseases_ready = db_connected and _disease_table_ready()
+    storage_configured, storage_connected, storage_message = _storage_status()
+    diseases_ready = storage_connected and diseases_store.catalog_ready()
     payload: dict = {
         "status": "ok",
-        "geminiConfigured": bool(settings.GEMINI_API_KEY.strip()),
-        "databaseConfigured": db_configured,
-        "databaseConnected": db_connected,
-        "databaseMessage": db_message,
+        "aiConfigured": bool(settings.OPENAI_API_KEY.strip()),
+        "aiModel": settings.OPENAI_MODEL,
+        "storageConfigured": storage_configured,
+        "storageConnected": storage_connected,
+        "storageMessage": storage_message,
+        "storageBucket": settings.GCS_BUCKET if storage_configured else None,
         "diseasesReady": diseases_ready,
     }
     if probe:
         try:
-            payload["gemini"] = gemini_service.probe_gemini()
+            payload["ai"] = openai_service.probe_openai()
         except Exception as exc:
-            payload["gemini"] = {
-                "configured": bool(settings.GEMINI_API_KEY.strip()),
+            payload["ai"] = {
+                "configured": bool(settings.OPENAI_API_KEY.strip()),
                 "working": False,
                 "message": str(exc)[:200],
                 "model": None,
@@ -90,7 +80,7 @@ def health_check(probe: bool = Query(False, description="Run a live Gemini API t
 @router.post("/decision", response_model=HealthDecisionResponse)
 def post_decision(body: DecisionRequest) -> HealthDecisionResponse:
     try:
-        assert_gemini_key()
+        assert_openai_key()
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 

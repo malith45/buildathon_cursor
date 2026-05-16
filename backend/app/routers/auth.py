@@ -3,7 +3,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
-from app.db.errors import is_database_unavailable
 from app.dependencies import get_current_user_id
 from app.schemas.auth import (
     AuthResponse,
@@ -13,14 +12,15 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services import auth_service
+from app.storage.errors import is_storage_unavailable
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-DB_UNAVAILABLE = (
-    "Database is unavailable. Check DATABASE_* in backend/.env and that "
-    "Supabase is reachable (Session pooler, port 5432)."
+STORAGE_UNAVAILABLE = (
+    "Storage is unavailable. Verify GCS_BUCKET and credentials in backend/.env, "
+    "then confirm the bucket exists and is reachable."
 )
 
 
@@ -32,8 +32,8 @@ def _raise_auth_error(exc: Exception) -> None:
             status_code=400,
             detail={"error": "Validation failed", "details": exc.errors()},
         ) from exc
-    if is_database_unavailable(exc):
-        raise HTTPException(status_code=503, detail=DB_UNAVAILABLE) from exc
+    if is_storage_unavailable(exc):
+        raise HTTPException(status_code=503, detail=STORAGE_UNAVAILABLE) from exc
     logger.exception("Auth request failed")
     raise HTTPException(
         status_code=500, detail="An unexpected error occurred."

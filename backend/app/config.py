@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,53 +11,53 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    GEMINI_API_KEY: str = ""
-    # Optional: force one model (e.g. gemini-2.0-flash-lite) to save quota
-    GEMINI_MODEL: str = ""
-    # False = one model per chat/probe (saves quota). True = try all fallbacks.
-    GEMINI_TRY_ALL_MODELS: bool = False
-    GEMINI_DECISION_RETRIES: int = 1
-    # False = no live API call on server start (use for pytest / quota saving)
-    GEMINI_PROBE_ON_STARTUP: bool = True
+    # ---------- OpenAI ----------
+    OPENAI_API_KEY: str = ""
+    # gpt-4o-mini is the cheap default (~$0.0004/triage call).
+    # Override to gpt-4o / gpt-4.1-mini if you want stronger reasoning.
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    # Retries inside health_decision_service on non-quota failures.
+    OPENAI_DECISION_RETRIES: int = 1
+    # Live API probe on backend boot (small request, costs ~$0.00002).
+    OPENAI_PROBE_ON_STARTUP: bool = False
+    # Hard request timeout for OpenAI calls (seconds).
+    OPENAI_TIMEOUT: float = 30.0
+
+    # ---------- Auth / server ----------
+    AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
     PORT: int = 4000
     CORS_ORIGIN: str = "http://localhost:3000"
-    AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
     APP_ENV: str = "development"
-    # Hard safety switch: destructive DB reset for tests only.
+    # Hard safety switch: destructive storage reset for tests only.
     ALLOW_TEST_DATA_RESET: bool = False
 
-    # Set false to run without Supabase (health/decision still work; auth/DB features off)
-    DATABASE_ENABLED: bool = True
-    DATABASE_CONNECT_TIMEOUT: int = 25
-
-    # Preferred: paste Session pooler URI from Supabase → Database → Connect
-    DATABASE_URL: str = ""
-
-    # Or set host/user/password separately (session pooler, port 5432)
-    DATABASE_HOST: str = ""
-    DATABASE_PORT: int = 5432
-    DATABASE_NAME: str = "postgres"
-    DATABASE_USER: str = ""
-    DATABASE_PASSWORD: str = ""
+    # ---------- Google Cloud Storage ----------
+    # Set false to run without GCS (decision still works; auth/chat persistence off).
+    STORAGE_ENABLED: bool = True
+    GCS_BUCKET: str = ""
+    # Optional explicit project ID (auto-detected from credentials when blank).
+    GCS_PROJECT: str = ""
+    # Path to a service-account JSON file. When set, exported to the
+    # GOOGLE_APPLICATION_CREDENTIALS env var so google-cloud-storage picks it up.
+    # Leave blank to fall back to Application Default Credentials (ADC).
+    GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
     @property
-    def database_configured(self) -> bool:
-        if not self.DATABASE_ENABLED:
-            return False
-        if self.DATABASE_URL.strip():
-            return True
-        return bool(
-            self.DATABASE_HOST.strip()
-            and self.DATABASE_USER.strip()
-            and self.DATABASE_PASSWORD
-        )
+    def storage_configured(self) -> bool:
+        return self.STORAGE_ENABLED and bool(self.GCS_BUCKET.strip())
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    # google-cloud-storage reads GOOGLE_APPLICATION_CREDENTIALS from os.environ,
+    # not from pydantic settings. Propagate it once at load time.
+    cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS.strip()
+    if cred_path and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred_path
+    return settings
 
 
-def assert_gemini_key() -> None:
-    if not get_settings().GEMINI_API_KEY.strip():
-        raise ValueError("GEMINI_API_KEY is not set in backend/.env")
+def assert_openai_key() -> None:
+    if not get_settings().OPENAI_API_KEY.strip():
+        raise ValueError("OPENAI_API_KEY is not set in backend/.env")

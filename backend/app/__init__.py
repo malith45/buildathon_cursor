@@ -1,1 +1,1 @@
-"""FastAPI backend for AI Health & Care Decision System."""
+"""FastAPI backend for MediAssist AI."""

@@ -6,10 +6,9 @@ from app.schemas.health import (
     ChatMessage,
     HealthDecisionResponse,
     HealthProfile,
-    UrgencyLevel,
 )
 from app.config import get_settings
-from app.services import gemini_service
+from app.services import openai_service
 
 URGENCY_VALUES: set[str] = {
     "self_care",
@@ -94,23 +93,28 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
     user_content = _build_user_content(profile, messages)
 
     settings = get_settings()
-    retries = max(1, settings.GEMINI_DECISION_RETRIES)
+    retries = max(1, settings.OPENAI_DECISION_RETRIES)
     last_error: Exception | None = None
-    for _ in range(retries):
+
+    for _attempt in range(retries):
         try:
-            raw = gemini_service.generate_json(SYSTEM_PROMPT, user_content)
+            raw = openai_service.generate_json(SYSTEM_PROMPT, user_content)
             decision = _parse_decision(raw)
             if decision:
                 return decision
+            last_error = ValueError("Could not parse model JSON")
         except Exception as exc:
             last_error = exc
+            # Stop immediately on quota errors — retrying just burns more budget.
+            if openai_service.is_quota_error(exc):
+                break
             continue
 
     fallback = FALLBACK_DECISION.model_copy()
-    if last_error and gemini_service.is_quota_error(last_error):
+    if last_error and openai_service.is_quota_error(last_error):
         fallback.summary = (
-            "Gemini API quota is exceeded on the free tier (429), so this is "
-            "generic guidance only. Wait a few minutes or check billing at "
-            "Google AI Studio, then try again."
+            "OpenAI's API quota or rate limit was exceeded. This is a generic "
+            "safety response. Check your usage at "
+            "https://platform.openai.com/usage and retry shortly."
         )
     return fallback

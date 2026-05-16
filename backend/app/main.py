@@ -8,10 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.db.connection import init_schema
-from app.db.errors import is_database_unavailable
 from app.routers import auth, chats, diseases, health
 from app.startup_checks import log_startup_connections
+from app.storage import client as storage_client
+from app.storage.errors import is_storage_unavailable
 
 
 logger = logging.getLogger(__name__)
@@ -32,23 +32,21 @@ async def lifespan(_app: FastAPI):
     _ensure_utf8_console()
     get_settings.cache_clear()
     settings = get_settings()
-    db_ok, _gemini_ok = log_startup_connections()
+    storage_ok, _ai_ok = log_startup_connections()
 
-    if settings.database_configured and db_ok:
+    if settings.storage_configured and storage_ok:
         try:
-            init_schema()
-            logger.info("Database schema ready.")
+            storage_client.init_storage()
+            logger.info("Storage layer ready.")
         except Exception as exc:
-            from app.db.connection import database_connection_hint
-
             hint = (
                 str(exc)
                 if str(exc) and "Could not reach" in str(exc)
-                else database_connection_hint()
+                else storage_client.storage_health_hint()
             )
             logger.warning(
-                "Database schema init failed (%s). %s "
-                "Set DATABASE_ENABLED=false to skip DB, or fix backend/.env.",
+                "Storage init failed (%s). %s "
+                "Set STORAGE_ENABLED=false to skip GCS, or fix backend/.env.",
                 exc.__class__.__name__,
                 hint,
             )
@@ -56,7 +54,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Health & Care Decision API",
+    title="MediAssist AI API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -114,17 +112,17 @@ async def validation_exception_handler(
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     message = str(exc)
-    if "GEMINI_API_KEY" in message:
+    if "OPENAI_API_KEY" in message:
         return JSONResponse(
             status_code=503,
-            content={"error": "Server is not configured with a Gemini API key."},
+            content={"error": "Server is not configured with an OpenAI API key."},
         )
-    if is_database_unavailable(exc):
+    if is_storage_unavailable(exc):
         return JSONResponse(
             status_code=503,
             content={
                 "error": (
-                    "Database is unavailable. Check DATABASE_* in backend/.env."
+                    "Storage is unavailable. Check GCS_BUCKET and credentials in backend/.env."
                 )
             },
         )

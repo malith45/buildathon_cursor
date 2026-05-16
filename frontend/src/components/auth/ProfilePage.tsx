@@ -66,7 +66,7 @@ function ProfileContent() {
         </p>
       </div>
 
-      <Card className="shadow-[var(--shadow-card)]">
+      <Card className="shadow-(--shadow-card)">
         <CardHeader>
           <CardTitle className="text-base">Account</CardTitle>
           <CardDescription>Basic account details</CardDescription>
@@ -96,11 +96,21 @@ function ProfileContent() {
         </CardContent>
       </Card>
 
-      <HealthProfileForm
-        embedded
-        profile={healthProfile}
-        onChange={setHealthProfile}
-      />
+      <Card className="shadow-(--shadow-card)">
+        <CardHeader className="border-b">
+          <CardTitle>Health profile</CardTitle>
+          <CardDescription>
+            Used when you request care guidance on the consult screen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <HealthProfileForm
+            embedded
+            profile={healthProfile}
+            onChange={setHealthProfile}
+          />
+        </CardContent>
+      </Card>
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={handleSave} disabled={saving} size="lg">

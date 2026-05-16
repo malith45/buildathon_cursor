@@ -1,10 +1,10 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "../../node_modules/tw-animate-css/dist/tw-animate.css";
+@import "../../node_modules/shadcn/dist/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Calm Wellness palette + shadcn semantic tokens */
+/* MediAssist AI palette + shadcn semantic tokens */
 @theme {
   --color-brand: #5b6cff;
   --color-mint: #3ed6a0;
@@ -109,8 +109,109 @@ html {
   }
   body {
     @apply min-h-full bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(at 8% 0%, rgba(91, 108, 255, 0.06) 0px, transparent 45%),
+      radial-gradient(at 92% 10%, rgba(62, 214, 160, 0.07) 0px, transparent 45%),
+      radial-gradient(at 50% 100%, rgba(183, 166, 255, 0.05) 0px, transparent 50%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
   }
+}
+
+@layer utilities {
+  .bg-mesh {
+    background-image:
+      radial-gradient(at 0% 0%, rgba(91, 108, 255, 0.12) 0px, transparent 40%),
+      radial-gradient(at 100% 0%, rgba(62, 214, 160, 0.10) 0px, transparent 40%),
+      radial-gradient(at 50% 100%, rgba(183, 166, 255, 0.08) 0px, transparent 50%);
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(92, 99, 112, 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(92, 99, 112, 0.25);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(92, 99, 112, 0.45);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.35s ease-out both;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  display: inline-block;
+  animation: bounce-dot 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
 }

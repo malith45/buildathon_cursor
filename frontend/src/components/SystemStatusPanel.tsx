@@ -21,7 +21,7 @@ function dotClass(state: RowState) {
 
 function rowBadgeClass(state: RowState) {
   return cn(
-    "gap-2 px-3 py-1.5 font-normal",
+    "h-7 gap-1.5 px-2.5 text-xs font-normal",
     state === "ok" && "border-mint/40 bg-mint/10",
     state === "warn" && "border-amber-500/40 bg-amber-500/10",
     state === "error" && "border-coral/40 bg-coral/10",
@@ -31,54 +31,58 @@ function rowBadgeClass(state: RowState) {
 
 function isLegacyHealth(health: SystemHealth | null): boolean {
   if (!health) return false;
-  return !("databaseConfigured" in health);
+  return !("aiConfigured" in health);
 }
 
 export default function SystemStatusPanel() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
-  const [probingGemini, setProbingGemini] = useState(false);
+  const [probingAi, setProbingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async (options?: { probe?: boolean; notify?: boolean }) => {
-    const probe = options?.probe ?? false;
-    const notify = options?.notify ?? false;
-    setLoading(true);
-    setProbingGemini(probe);
-    setError(null);
-    try {
-      const data = await fetchSystemHealth(probe);
-      setHealth(data);
-      if (notify) {
-        const legacy = !("databaseConfigured" in data);
-        const ok =
-          !legacy &&
-          data.databaseConnected &&
-          data.gemini?.working === true;
-        if (ok) {
-          toast.success("Systems check passed", "API, database, and Gemini are OK.");
-        } else {
-          toast.warning(
-            "Systems check incomplete",
-            legacy
-              ? "Restart the backend (npm run dev in backend/)."
-              : (data.gemini?.message ??
-                  data.databaseMessage ??
-                  "See status badges for details.")
-          );
+  const refresh = useCallback(
+    async (options?: { probe?: boolean; notify?: boolean }) => {
+      const probe = options?.probe ?? false;
+      const notify = options?.notify ?? false;
+      setLoading(true);
+      setProbingAi(probe);
+      setError(null);
+      try {
+        const data = await fetchSystemHealth(probe);
+        setHealth(data);
+        if (notify) {
+          const legacy = !("aiConfigured" in data);
+          const ok =
+            !legacy && data.storageConnected && data.ai?.working === true;
+          if (ok) {
+            toast.success(
+              "Systems check passed",
+              "API, GCS, and OpenAI are all responsive."
+            );
+          } else {
+            toast.warning(
+              "Systems check incomplete",
+              legacy
+                ? "Restart the backend (uvicorn app.main:app)."
+                : (data.ai?.message ??
+                    data.storageMessage ??
+                    "See status badges for details.")
+            );
+          }
         }
+      } catch (e) {
+        setHealth(null);
+        const msg = errorMessage(e, "Could not reach the API server");
+        setError(msg);
+        if (notify) {
+          toast.error("API unreachable", msg);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      setHealth(null);
-      const msg = errorMessage(e, "Could not reach the API server");
-      setError(msg);
-      if (notify) {
-        toast.error("API unreachable", msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     void refresh({ probe: false });
@@ -94,77 +98,78 @@ export default function SystemStatusPanel() {
         ? "warn"
         : "ok";
 
-  const dbConfigured =
-    health?.databaseConfigured ?? (legacyApi ? false : true);
-  const dbConnected = health?.databaseConnected === true;
+  const storageConfigured = health?.storageConfigured ?? !legacyApi;
+  const storageConnected = health?.storageConnected === true;
 
-  const dbState: RowState = loading
+  const storageState: RowState = loading
     ? "loading"
     : !health
       ? "error"
       : legacyApi
         ? "warn"
-        : !dbConfigured
+        : !storageConfigured
           ? "warn"
-          : dbConnected
+          : storageConnected
             ? "ok"
             : "error";
 
-  const geminiState: RowState = loading
+  const aiState: RowState = loading
     ? "loading"
     : legacyApi
       ? "warn"
-      : !health?.gemini
-        ? health?.geminiConfigured
+      : !health?.ai
+        ? health?.aiConfigured
           ? "warn"
           : "error"
-        : !health.gemini.configured
+        : !health.ai.configured
           ? "error"
-          : health.gemini.working
+          : health.ai.working
             ? "ok"
             : "error";
 
-  const dbLabel = loading
-    ? "Database…"
+  const storageLabel = loading
+    ? "Storage…"
     : legacyApi
-      ? "Database: restart API"
-      : !dbConfigured
-        ? "Database not configured"
-        : dbConnected
-          ? "Database connected"
-          : "Database unavailable";
+      ? "Storage: restart API"
+      : !storageConfigured
+        ? "GCS not configured"
+        : storageConnected
+          ? health?.storageBucket
+            ? `GCS: ${health.storageBucket}`
+            : "GCS connected"
+          : "GCS unavailable";
 
-  const geminiLabel = loading
-    ? probingGemini
-      ? "Testing Gemini…"
+  const aiLabel = loading
+    ? probingAi
+      ? "Testing OpenAI…"
       : "Checking…"
     : legacyApi
-      ? "Gemini: restart API"
-      : !health?.gemini
-        ? health?.geminiConfigured
-          ? "Gemini: configured"
-          : "Gemini: not configured"
-        : health.gemini.working
-          ? `Gemini: ${health.gemini.model ?? "OK"}`
-          : "Gemini: not working";
+      ? "OpenAI: restart API"
+      : !health?.ai
+        ? health?.aiConfigured
+          ? `OpenAI: ${health?.aiModel ?? "configured"}`
+          : "OpenAI: not configured"
+        : health.ai.working
+          ? `OpenAI: ${health.ai.model ?? health?.aiModel ?? "OK"}`
+          : "OpenAI: not working";
 
   const detailLines: string[] = [];
   if (legacyApi) {
     detailLines.push(
-      "Backend is running old code. Stop it and run: cd backend && npm run dev"
+      "Backend is running old code. Restart with: cd backend && uvicorn app.main:app --reload --port 4000"
     );
   }
-  if (health?.databaseMessage && !dbConnected) {
-    detailLines.push(health.databaseMessage);
+  if (health?.storageMessage && !storageConnected) {
+    detailLines.push(health.storageMessage);
   }
-  if (health?.gemini?.message) {
-    detailLines.push(health.gemini.message);
-    if (health.gemini.working && health.gemini.sample) {
-      detailLines.push(`Sample response: “${health.gemini.sample}”`);
+  if (health?.ai?.message) {
+    detailLines.push(health.ai.message);
+    if (health.ai.working && health.ai.sample) {
+      detailLines.push(`Sample response: "${health.ai.sample}"`);
     }
-  } else if (health?.geminiConfigured && !health?.gemini && !legacyApi) {
+  } else if (health?.aiConfigured && !health?.ai && !legacyApi) {
     detailLines.push(
-      "Gemini not tested on load (saves quota). Use “Test Gemini” when needed."
+      "OpenAI not tested on load (saves a tiny bit of usage). Use \u201CTest OpenAI\u201D when needed."
     );
   }
   if (error) {
@@ -172,8 +177,8 @@ export default function SystemStatusPanel() {
   }
 
   return (
-    <section className="flex flex-col gap-2 sm:items-end">
-      <section className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-col items-stretch gap-2 sm:items-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Badge variant="outline" className={rowBadgeClass(apiState)}>
           <span className={dotClass(apiState)} aria-hidden />
           {loading
@@ -185,34 +190,34 @@ export default function SystemStatusPanel() {
                 : "API online"}
         </Badge>
 
-        <Badge variant="outline" className={rowBadgeClass(dbState)}>
-          <span className={dotClass(dbState)} aria-hidden />
-          {dbLabel}
+        <Badge variant="outline" className={rowBadgeClass(storageState)}>
+          <span className={dotClass(storageState)} aria-hidden />
+          {storageLabel}
         </Badge>
 
-        <Badge variant="outline" className={rowBadgeClass(geminiState)}>
-          <span className={dotClass(geminiState)} aria-hidden />
-          {geminiLabel}
+        <Badge variant="outline" className={rowBadgeClass(aiState)}>
+          <span className={dotClass(aiState)} aria-hidden />
+          {aiLabel}
         </Badge>
 
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 px-2 text-xs text-muted-foreground"
-          title="Calls Gemini once (uses API quota)"
+          className="h-7 px-2.5 text-xs text-muted-foreground"
+          title="Calls OpenAI once (uses a tiny bit of API usage)"
           onClick={() => void refresh({ probe: true, notify: true })}
           disabled={loading}
         >
-          {loading ? "Checking…" : "Test Gemini"}
+          {loading ? "Checking…" : "Test OpenAI"}
         </Button>
-      </section>
+      </div>
 
       {!loading && detailLines.length > 0 && (
         <p
           className={cn(
-            "max-w-md text-right text-xs leading-relaxed",
-            geminiState === "error" || dbState === "error"
+            "max-w-md text-xs leading-relaxed sm:text-right",
+            aiState === "error" || storageState === "error"
               ? "text-coral"
               : "text-muted-foreground"
           )}
@@ -220,6 +225,6 @@ export default function SystemStatusPanel() {
           {detailLines.join(" · ")}
         </p>
       )}
-    </section>
+    </div>
   );
 }

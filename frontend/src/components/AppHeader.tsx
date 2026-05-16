@@ -7,6 +7,7 @@ import { useSafeNavigate } from "@/lib/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { APP_NAME } from "@/lib/brand";
 import { Activity, LogOut, User } from "lucide-react";
 
 const NAV = [
@@ -28,16 +29,16 @@ export default function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-line/60 bg-card/80 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="flex items-center gap-2 font-heading text-sm font-semibold text-foreground"
+          className="group/logo flex items-center gap-2.5 font-heading text-sm font-semibold text-foreground"
         >
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-linear-to-br from-primary to-lavender text-primary-foreground shadow-sm transition-transform group-hover/logo:scale-105">
             <Activity className="size-4" />
           </span>
-          <span className="hidden sm:inline">Calm Wellness</span>
+          <span className="hidden sm:inline">{APP_NAME}</span>
         </Link>
 
         <nav className="flex items-center gap-1">

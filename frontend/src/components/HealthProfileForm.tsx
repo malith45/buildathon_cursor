@@ -173,25 +173,17 @@ export default function HealthProfileForm({
     </>
   );
 
-  const header = embedded ? (
-    <>
-      <p className={sectionSubtitle}>Health</p>
-      <CardTitle className={sectionTitle}>Health profile</CardTitle>
-      <CardDescription>
-        Used when you request care guidance on the consult screen.
-      </CardDescription>
-    </>
-  ) : (
-    <>
-      <p className={sectionSubtitle}>Context</p>
-      <CardTitle className={sectionTitle}>Health profile</CardTitle>
-      <CardDescription>Helps tailor guidance to you.</CardDescription>
-    </>
-  );
+  if (embedded) {
+    return <div className="space-y-4">{fields}</div>;
+  }
 
   return (
-    <Card className="shadow-[var(--shadow-card)]">
-      <CardHeader className="border-b">{header}</CardHeader>
+    <Card className="shadow-(--shadow-card)">
+      <CardHeader className="border-b">
+        <p className={sectionSubtitle}>Context</p>
+        <CardTitle className={sectionTitle}>Health profile</CardTitle>
+        <CardDescription>Helps tailor guidance to you.</CardDescription>
+      </CardHeader>
       <CardContent className="space-y-4">{fields}</CardContent>
     </Card>
   );

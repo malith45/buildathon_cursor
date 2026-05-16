@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { APP_NAME } from "@/lib/brand";
 import { Loader2 } from "lucide-react";
 
 export default function SignupForm() {
@@ -42,11 +43,11 @@ export default function SignupForm() {
   }
 
   return (
-    <Card className="w-full max-w-md shadow-[var(--shadow-card)]">
+    <Card className="w-full max-w-md shadow-(--shadow-card)">
       <CardHeader>
         <CardTitle className="font-heading text-xl">Create account</CardTitle>
         <CardDescription>
-          Sign up to save your health profile across devices.
+          Join {APP_NAME} to save your health profile across devices.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
