@@ -19,12 +19,13 @@ import { loadProfile, saveProfile } from "@/lib/profile-storage";
 import {
   ChatMessage,
   ChatSession,
+  DEFAULT_PROFILE,
   HealthDecisionResponse,
   HealthProfile,
 } from "@/lib/types";
 
 export default function HomeClient() {
-  const [profile, setProfile] = useState<HealthProfile>(() => loadProfile());
+  const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,6 +35,7 @@ export default function HomeClient() {
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
   useEffect(() => {
+    setProfile(loadProfile());
     setSessions(loadSessions());
     checkBackendHealth().then(setBackendOk);
   }, []);
