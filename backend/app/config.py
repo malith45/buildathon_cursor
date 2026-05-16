@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # False = one model per chat/probe (saves quota). True = try all fallbacks.
     GEMINI_TRY_ALL_MODELS: bool = False
     GEMINI_DECISION_RETRIES: int = 1
+    # False = no live API call on server start (use for pytest / quota saving)
+    GEMINI_PROBE_ON_STARTUP: bool = True
     PORT: int = 4000
     CORS_ORIGIN: str = "http://localhost:3000"
     AUTH_SECRET: str = "dev-only-change-in-production-buildathon"

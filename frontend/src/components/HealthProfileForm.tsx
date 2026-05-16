@@ -50,6 +50,8 @@ export default function HealthProfileForm({
   const update = (partial: Partial<HealthProfile>) =>
     onChange({ ...profile, ...partial });
 
+  const pregnantEnabled = profile.sex === "female";
+
   const fields = (
     <>
         <div className="space-y-2">
@@ -84,8 +86,11 @@ export default function HealthProfileForm({
             }
             onValueChange={(value) => {
               if (!value) return;
+              const sex =
+                value === SEX_UNSPECIFIED ? undefined : value;
               update({
-                sex: value === SEX_UNSPECIFIED ? undefined : value,
+                sex,
+                ...(sex !== "female" ? { pregnant: undefined } : {}),
               });
             }}
           >
@@ -138,16 +143,31 @@ export default function HealthProfileForm({
           />
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3">
+        <div
+          className={`flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3 ${
+            pregnantEnabled ? "" : "opacity-50"
+          }`}
+        >
           <Checkbox
             id="pregnant"
-            checked={!!profile.pregnant}
+            disabled={!pregnantEnabled}
+            checked={pregnantEnabled && !!profile.pregnant}
             onCheckedChange={(checked) =>
               update({ pregnant: checked === true })
             }
           />
-          <Label htmlFor="pregnant" className="cursor-pointer font-normal">
+          <Label
+            htmlFor="pregnant"
+            className={`font-normal ${
+              pregnantEnabled
+                ? "cursor-pointer"
+                : "cursor-not-allowed text-muted-foreground"
+            }`}
+          >
             Currently pregnant
+            {!pregnantEnabled && (
+              <span className="ml-1 text-xs">(select Female to enable)</span>
+            )}
           </Label>
         </div>
     </>

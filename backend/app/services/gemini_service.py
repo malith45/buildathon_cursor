@@ -19,16 +19,17 @@ def is_quota_error(exc: Exception) -> bool:
     )
 
 
-def _models_to_try(*, allow_fallbacks: bool | None = None) -> tuple[str, ...]:
+def _ordered_models() -> tuple[str, ...]:
     settings = get_settings()
     primary = settings.GEMINI_MODEL.strip()
     if primary:
-        ordered: tuple[str, ...] = (primary,) + tuple(
-            m for m in DEFAULT_MODELS if m != primary
-        )
-    else:
-        ordered = DEFAULT_MODELS
+        return (primary,) + tuple(m for m in DEFAULT_MODELS if m != primary)
+    return DEFAULT_MODELS
 
+
+def _models_to_try(*, allow_fallbacks: bool | None = None) -> tuple[str, ...]:
+    ordered = _ordered_models()
+    settings = get_settings()
     use_all = (
         settings.GEMINI_TRY_ALL_MODELS
         if allow_fallbacks is None
@@ -37,6 +38,20 @@ def _models_to_try(*, allow_fallbacks: bool | None = None) -> tuple[str, ...]:
     if use_all:
         return ordered
     return (ordered[0],)
+
+
+def _expand_models_on_quota(
+    models: tuple[str, ...], *, quota_hits: int
+) -> tuple[str, ...]:
+    """If the primary model is out of quota, try siblings (separate free-tier pools)."""
+    if quota_hits == 0:
+        return models
+    ordered = _ordered_models()
+    if len(models) >= len(ordered):
+        return models
+    seen = set(models)
+    extra = tuple(m for m in ordered if m not in seen)
+    return models + extra
 
 
 def _client() -> genai.Client:
@@ -67,7 +82,10 @@ def generate_json(system_instruction: str, user_content: str) -> str:
 
     models = _models_to_try()
     quota_hits = 0
-    for model_name in models:
+    idx = 0
+    while idx < len(models):
+        model_name = models[idx]
+        idx += 1
         try:
             response = client.models.generate_content(
                 model=model_name,
@@ -85,6 +103,7 @@ def generate_json(system_instruction: str, user_content: str) -> str:
             last_error = exc
             if is_quota_error(exc):
                 quota_hits += 1
+                models = _expand_models_on_quota(models, quota_hits=quota_hits)
             continue
 
     if last_error and quota_hits == len(models):
@@ -113,13 +132,17 @@ def probe_gemini() -> dict:
     client = _client()
     last_error: Exception | None = None
 
+    models = _models_to_try(allow_fallbacks=False)
     quota_hits = 0
-    for model_name in _models_to_try(allow_fallbacks=False):
+    idx = 0
+    while idx < len(models):
+        model_name = models[idx]
+        idx += 1
         try:
             response = client.models.generate_content(
                 model=model_name,
                 contents="Reply with exactly: OK",
-                config=types.GenerateContentConfig(max_output_tokens=16),
+                config=types.GenerateContentConfig(max_output_tokens=64),
             )
             text = _response_text(response)
             if not text:
@@ -135,12 +158,18 @@ def probe_gemini() -> dict:
             last_error = exc
             if is_quota_error(exc):
                 quota_hits += 1
+                models = _expand_models_on_quota(models, quota_hits=quota_hits)
             continue
 
-    if quota_hits > 0:
+    if quota_hits > 0 and quota_hits >= len(_ordered_models()):
         msg = (
-            "Gemini free-tier quota exceeded (429). Limits reset daily — "
-            "wait and retry, or check usage at https://aistudio.google.com"
+            "Gemini free-tier quota exceeded (429) on all configured models. "
+            "Limits reset daily — wait and retry, or check usage at https://aistudio.google.com"
+        )
+    elif quota_hits > 0:
+        msg = (
+            f"Primary model quota exceeded (429); tried fallbacks. "
+            f"Last error: {str(last_error)[:100] if last_error else 'unknown'}"
         )
     else:
         msg = str(last_error)[:160] if last_error else "All models failed"

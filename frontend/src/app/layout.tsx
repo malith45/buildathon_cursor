@@ -29,8 +29,12 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
       style={{ colorScheme: "light" }}
+      suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">
+      <body
+        className="flex min-h-full flex-col"
+        suppressHydrationWarning
+      >
         <div
           className="pointer-events-none fixed inset-0 -z-10 bg-background"
           aria-hidden

@@ -1,4 +1,5 @@
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,15 +11,30 @@ from app.config import get_settings
 from app.db.connection import init_schema
 from app.db.errors import is_database_unavailable
 from app.routers import auth, diseases, health
+from app.startup_checks import log_startup_connections
 
 
 logger = logging.getLogger(__name__)
 
 
+def _ensure_utf8_console() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    _ensure_utf8_console()
+    get_settings.cache_clear()
     settings = get_settings()
-    if settings.database_configured:
+    db_ok, _gemini_ok = log_startup_connections()
+
+    if settings.database_configured and db_ok:
         try:
             init_schema()
             logger.info("Database schema ready.")

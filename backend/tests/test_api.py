@@ -1,9 +1,4 @@
-import os
 from functools import lru_cache
-
-os.environ.setdefault("AUTH_SECRET", "test-secret")
-os.environ.setdefault("GEMINI_API_KEY", "test-key")
-
 from unittest.mock import patch
 
 import pytest
