@@ -1,6 +1,7 @@
 "use client";
 
-import { ChatMessage } from "@/lib/types";
+import { ChatMessage, HealthDecisionResponse } from "@/lib/types";
+import DecisionMessage from "@/components/DecisionMessage";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +57,14 @@ interface Props {
   messages: ChatMessage[];
   onSend: (text: string) => void;
   loading?: boolean;
+  /**
+   * Decision for the most recent assistant message. When present, the
+   * trailing model message is rendered as a rich triage card instead of a
+   * plain text bubble. Older assistant messages (from earlier turns) keep
+   * their plain-text rendering — their per-turn decisions aren't retained
+   * by the current session schema.
+   */
+  decision?: HealthDecisionResponse | null;
 }
 
 function Avatar({ role }: { role: ChatMessage["role"] }) {
@@ -73,7 +82,23 @@ function Avatar({ role }: { role: ChatMessage["role"] }) {
   );
 }
 
-export default function Chat({ messages, onSend, loading }: Props) {
+export default function Chat({
+  messages,
+  onSend,
+  loading,
+  decision,
+}: Props) {
+  // Find the last assistant message — only that one gets the rich card.
+  let lastModelIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "model") {
+      lastModelIdx = i;
+      break;
+    }
+  }
+  const firstModelIdx = messages.findIndex((m) => m.role === "model");
+  const isFirstAssistantTurn =
+    lastModelIdx >= 0 && firstModelIdx === lastModelIdx;
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
@@ -138,25 +163,14 @@ export default function Chat({ messages, onSend, loading }: Props) {
           )}
         </Button>
       </div>
-      <p className="mt-1.5 flex items-center justify-center gap-1.5 px-1 text-[11px] leading-snug text-muted-foreground">
-        <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
-          Enter
-        </kbd>
-        to send
-        <span className="text-muted-foreground/50">·</span>
-        <kbd className="rounded border border-line/60 bg-muted/60 px-1 py-px font-mono text-[10px]">
-          Shift + Enter
-        </kbd>
-        new line
-      </p>
     </form>
   );
 
   return (
-    <Card className="relative flex h-full min-h-[360px] flex-col overflow-hidden border-line/70 bg-card/95">
+    <Card className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden border-line/70 bg-card/95">
       {isEmpty ? (
         /* Empty state — hero + starters + composer as one cohesive centered block */
-        <div className="scrollbar-thin flex flex-1 items-center justify-center overflow-y-auto px-5 py-6">
+        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain px-5 py-6">
           <div className="w-full max-w-2xl space-y-6">
             <div className="animate-fade-up flex flex-col items-center text-center">
               <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary/20 to-mint/20 text-primary ring-1 ring-primary/20">
@@ -211,31 +225,45 @@ export default function Chat({ messages, onSend, loading }: Props) {
           </div>
         </div>
       ) : (
-        /* Conversation — scrollable messages with composer pinned to the bottom */
-        <>
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+        /* Conversation — only the message list scrolls; composer stays pinned */
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-5">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "animate-fade-up flex gap-3",
-                    m.role === "user" && "flex-row-reverse"
-                  )}
-                >
-                  <Avatar role={m.role} />
+              {messages.map((m, i) => {
+                const isUser = m.role === "user";
+                const showDecisionCard =
+                  !isUser && i === lastModelIdx && decision != null;
+                return (
                   <div
+                    key={i}
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-                      m.role === "user"
-                        ? "rounded-tr-sm bg-primary text-primary-foreground"
-                        : "rounded-tl-sm border border-line/60 bg-card"
+                      "animate-fade-up flex gap-3",
+                      isUser && "flex-row-reverse"
                     )}
                   >
-                    {m.text}
+                    <Avatar role={m.role} />
+                    {showDecisionCard ? (
+                      <div className="min-w-0 flex-1">
+                        <DecisionMessage
+                          decision={decision!}
+                          showLeadDisclaimer={isFirstAssistantTurn}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                          isUser
+                            ? "rounded-tr-sm bg-primary text-primary-foreground"
+                            : "rounded-tl-sm border border-line/60 bg-card"
+                        )}
+                      >
+                        {m.text}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {loading && (
                 <div className="animate-fade-in flex gap-3">
@@ -255,7 +283,7 @@ export default function Chat({ messages, onSend, loading }: Props) {
           <div className="shrink-0 border-t border-line/60 bg-card/95 px-5 py-3 backdrop-blur-sm">
             {composer}
           </div>
-        </>
+        </div>
       )}
     </Card>
   );

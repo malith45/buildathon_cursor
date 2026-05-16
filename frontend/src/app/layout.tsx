@@ -1,9 +1,51 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ShieldAlert } from "lucide-react";
 import Providers from "@/components/Providers";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
 import "./globals.css";
+
+// Strips attributes that browser extensions (Bitdefender TrafficLight, AdGuard,
+// Wappalyzer, etc.) inject into the SSR HTML before React hydrates. Without
+// this, every page render emits a "tree hydrated but some attributes... didn't
+// match" console warning in dev. Production unaffected — Next never logs
+// hydration warnings there — but the dev noise is annoying and obscures real
+// bugs. The script is inlined synchronously as the first body child so it runs
+// before any content-script timing.
+const EXTENSION_ATTR_STRIPPER = `
+(function() {
+  var KILL = ['bis_skin_checked','bis_register','data-extension-installed','data-darkreader-inline-color','data-darkreader-inline-bgcolor'];
+  function strip(el) {
+    if (!el || el.nodeType !== 1) return;
+    for (var i = KILL.length - 1; i >= 0; i--) {
+      if (el.hasAttribute(KILL[i])) el.removeAttribute(KILL[i]);
+    }
+  }
+  function walk(root) {
+    strip(root);
+    if (root.querySelectorAll) {
+      var els = root.querySelectorAll('[' + KILL.join('],[') + ']');
+      for (var i = 0; i < els.length; i++) strip(els[i]);
+    }
+  }
+  try { walk(document.documentElement); } catch(e) {}
+  if (typeof MutationObserver !== 'undefined') {
+    try {
+      new MutationObserver(function(muts) {
+        for (var i = 0; i < muts.length; i++) {
+          var m = muts[i];
+          if (m.type === 'attributes') strip(m.target);
+          for (var j = 0; j < m.addedNodes.length; j++) walk(m.addedNodes[j]);
+        }
+      }).observe(document.documentElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: KILL
+      });
+    } catch(e) {}
+  }
+})();
+`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +74,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body
-        className="flex min-h-full flex-col"
+        className="flex h-dvh min-h-0 flex-col overflow-hidden"
         suppressHydrationWarning
       >
+        <script
+          dangerouslySetInnerHTML={{ __html: EXTENSION_ATTR_STRIPPER }}
+        />
         <div
           className="pointer-events-none fixed inset-0 -z-10 bg-background"
           aria-hidden
@@ -48,27 +93,6 @@ export default function RootLayout({
           aria-hidden
         />
         <Providers>{children}</Providers>
-        <footer className="mt-auto border-t border-line/60 bg-card/40 px-4 py-3 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-[1500px] flex-col items-center gap-1 text-center text-[11px] leading-relaxed">
-            <p className="flex items-center gap-1.5 text-muted-foreground">
-              <ShieldAlert
-                className="size-3 shrink-0 text-lavender"
-                aria-hidden
-              />
-              <span>
-                <span className="font-medium text-foreground/80">
-                  Not medical advice.
-                </span>{" "}
-                In an emergency, call your local emergency number.
-              </span>
-            </p>
-            <p className="text-muted-foreground/70">
-              {APP_NAME} · Built by team{" "}
-              <span className="font-medium text-foreground/70">Mcee</span> ·
-              Educational use only
-            </p>
-          </div>
-        </footer>
       </body>
     </html>
   );

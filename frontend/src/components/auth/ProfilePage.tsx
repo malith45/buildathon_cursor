@@ -5,6 +5,7 @@ import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSafeNavigate } from "@/lib/navigation";
 import { DEFAULT_PROFILE, type HealthProfile } from "@/lib/types";
 import { errorMessage, toast } from "@/lib/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,15 +18,18 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 function ProfileContent() {
   const { user, updateName, updateHealthProfile } = useAuth();
+  const navigate = useSafeNavigate();
   const [name, setName] = useState("");
   const [healthProfile, setHealthProfile] =
     useState<HealthProfile>(DEFAULT_PROFILE);
   const [saving, setSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -38,19 +42,28 @@ function ProfileContent() {
     if (!user) return;
     setSaving(true);
     try {
+      const updates: Promise<unknown>[] = [];
       if (name.trim() !== user.name) {
-        await updateName(name.trim());
+        updates.push(updateName(name.trim()));
       }
-      await updateHealthProfile(healthProfile);
-      toast.success("Profile saved", "Your health context is up to date.");
+      updates.push(updateHealthProfile(healthProfile));
+      // Issue both updates in parallel so the user waits on the slower
+      // of the two, not the sum.
+      await Promise.all(updates);
+      setShowSuccess(true);
     } catch (err) {
       toast.error(
-        "Could not save profile",
+        "Couldn't save profile",
         errorMessage(err, "Please try again.")
       );
     } finally {
       setSaving(false);
     }
+  }
+
+  function continueToHome() {
+    setShowSuccess(false);
+    navigate("/");
   }
 
   if (!user) return null;
@@ -115,7 +128,7 @@ function ProfileContent() {
       <div className="flex flex-wrap gap-3">
         <Button onClick={handleSave} disabled={saving} size="lg">
           {saving && <Loader2 className="size-4 animate-spin" />}
-          Save profile
+          {saving ? "Saving…" : "Save profile"}
         </Button>
         <Link href="/" className={buttonVariants({ variant: "outline", size: "lg" })}>
           Back to consult
@@ -127,6 +140,36 @@ function ProfileContent() {
       <p className="text-xs text-muted-foreground">
         Member since {new Date(user.createdAt).toLocaleDateString()}
       </p>
+
+      <Modal
+        open={showSuccess}
+        onOpenChange={setShowSuccess}
+        closeOnBackdrop={false}
+      >
+        <div className="px-6 pt-6 pb-2 text-center sm:px-7 sm:pt-7">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-mint/15 text-mint ring-1 ring-mint/30">
+            <CheckCircle2 className="size-6" />
+          </div>
+          <h2 className="font-heading text-lg font-semibold">All set!</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Your health profile is saved. We'll use it to tailor guidance the
+            next time you describe symptoms.
+          </p>
+        </div>
+        <div className="flex items-center justify-center gap-2 border-t border-line/60 bg-muted/30 px-6 py-3 sm:px-7">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSuccess(false)}
+          >
+            Stay here
+          </Button>
+          <Button type="button" size="sm" onClick={continueToHome}>
+            Continue to chat
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -50,7 +50,11 @@ export default function HealthProfileForm({
   const update = (partial: Partial<HealthProfile>) =>
     onChange({ ...profile, ...partial });
 
-  const pregnantEnabled = profile.sex === "female";
+  // Pregnant question is hidden only when sex is explicitly male.
+  // Shown (and enabled) for female / other / unspecified — anyone who could
+  // plausibly be answering "yes" — and the boolean is auto-cleared when the
+  // user switches *to* male (handled in the sex onValueChange below).
+  const showPregnant = profile.sex !== "male";
 
   const fields = (
     <>
@@ -90,7 +94,7 @@ export default function HealthProfileForm({
                 value === SEX_UNSPECIFIED ? undefined : value;
               update({
                 sex,
-                ...(sex !== "female" ? { pregnant: undefined } : {}),
+                ...(sex === "male" ? { pregnant: undefined } : {}),
               });
             }}
           >
@@ -143,33 +147,20 @@ export default function HealthProfileForm({
           />
         </div>
 
-        <div
-          className={`flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3 ${
-            pregnantEnabled ? "" : "opacity-50"
-          }`}
-        >
-          <Checkbox
-            id="pregnant"
-            disabled={!pregnantEnabled}
-            checked={pregnantEnabled && !!profile.pregnant}
-            onCheckedChange={(checked) =>
-              update({ pregnant: checked === true })
-            }
-          />
-          <Label
-            htmlFor="pregnant"
-            className={`font-normal ${
-              pregnantEnabled
-                ? "cursor-pointer"
-                : "cursor-not-allowed text-muted-foreground"
-            }`}
-          >
-            Currently pregnant
-            {!pregnantEnabled && (
-              <span className="ml-1 text-xs">(select Female to enable)</span>
-            )}
-          </Label>
-        </div>
+        {showPregnant && (
+          <div className="animate-fade-in flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3">
+            <Checkbox
+              id="pregnant"
+              checked={!!profile.pregnant}
+              onCheckedChange={(checked) =>
+                update({ pregnant: checked === true })
+              }
+            />
+            <Label htmlFor="pregnant" className="cursor-pointer font-normal">
+              Currently pregnant
+            </Label>
+          </div>
+        )}
     </>
   );
 

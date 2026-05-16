@@ -9,7 +9,9 @@ would result in one of them retrying or failing cleanly.
 """
 
 import logging
+import time
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +28,45 @@ logger = logging.getLogger(__name__)
 USERS_PREFIX = "users/"
 EMAIL_INDEX_PATH = "indexes/users_by_email.json"
 INDEX_VERSION = 1
+
+# In-memory cache of the email→user_id index. Cuts ~200-400 ms off every
+# login (1 GCS read instead of 2) and every signup (the duplicate-check read
+# is satisfied from cache). Cache is automatically invalidated whenever
+# we successfully write the index (insert_user / delete_user / migrations),
+# and additionally expires after CACHE_TTL_SECONDS as a safety net for
+# multi-process or out-of-band writes.
+CACHE_TTL_SECONDS = 30.0
+_index_cache_lock = Lock()
+_index_cache: dict[str, str] | None = None
+_index_cache_generation: int = 0
+_index_cache_expires_at: float = 0.0
+
+
+def _read_cached_index() -> tuple[dict[str, str], int] | None:
+    """Return cached (index, generation) if still fresh, else None."""
+    with _index_cache_lock:
+        if _index_cache is None:
+            return None
+        if time.monotonic() >= _index_cache_expires_at:
+            return None
+        # Return a defensive copy so callers can mutate it freely.
+        return dict(_index_cache), _index_cache_generation
+
+
+def _set_cached_index(index: dict[str, str], generation: int) -> None:
+    global _index_cache, _index_cache_generation, _index_cache_expires_at
+    with _index_cache_lock:
+        _index_cache = dict(index)
+        _index_cache_generation = generation
+        _index_cache_expires_at = time.monotonic() + CACHE_TTL_SECONDS
+
+
+def _invalidate_cached_index() -> None:
+    global _index_cache, _index_cache_generation, _index_cache_expires_at
+    with _index_cache_lock:
+        _index_cache = None
+        _index_cache_generation = 0
+        _index_cache_expires_at = 0.0
 
 DEFAULT_PROFILE_JSON: dict[str, Any] = {
     "ageRange": "25-34",
@@ -61,14 +102,22 @@ def _record_to_dict(raw: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _load_email_index() -> tuple[dict[str, str], int]:
+def _load_email_index(*, use_cache: bool = True) -> tuple[dict[str, str], int]:
+    if use_cache:
+        cached = _read_cached_index()
+        if cached is not None:
+            return cached
     data, generation = client.read_json(EMAIL_INDEX_PATH)
     if not isinstance(data, dict):
+        _set_cached_index({}, generation)
         return {}, generation
     by_email = data.get("by_email")
     if not isinstance(by_email, dict):
+        _set_cached_index({}, generation)
         return {}, generation
-    return {str(k).lower(): str(v) for k, v in by_email.items()}, generation
+    normalized = {str(k).lower(): str(v) for k, v in by_email.items()}
+    _set_cached_index(normalized, generation)
+    return normalized, generation
 
 
 def _save_email_index(
@@ -83,19 +132,30 @@ def _save_email_index(
         # 0 means "blob must not exist yet"
         if_generation_match = client.IF_DOES_NOT_EXIST
     try:
-        return client.write_json(
+        new_generation = client.write_json(
             EMAIL_INDEX_PATH,
             payload,
             if_generation_match=if_generation_match,
         )
     except gapi_exceptions.PreconditionFailed as exc:
+        # Stale cache could have caused this — drop it so the next read
+        # goes to GCS.
+        _invalidate_cached_index()
         raise StorageConflict("Email index changed during write") from exc
+    # Successful write: refresh cache with what we just persisted.
+    _set_cached_index(
+        {str(k).lower(): str(v) for k, v in by_email.items()},
+        new_generation,
+    )
+    return new_generation
 
 
 def _add_email_to_index(email: str, user_id: str, *, max_retries: int = 5) -> None:
     normalized = email.strip().lower()
     for attempt in range(max_retries):
-        index, generation = _load_email_index()
+        # First attempt may use cached index; on retry, force a fresh read
+        # since a stale cache likely caused the write conflict.
+        index, generation = _load_email_index(use_cache=attempt == 0)
         existing = index.get(normalized)
         if existing and existing != user_id:
             raise StorageConflict(
@@ -114,7 +174,7 @@ def _add_email_to_index(email: str, user_id: str, *, max_retries: int = 5) -> No
 def _remove_email_from_index(email: str, *, max_retries: int = 5) -> None:
     normalized = email.strip().lower()
     for attempt in range(max_retries):
-        index, generation = _load_email_index()
+        index, generation = _load_email_index(use_cache=attempt == 0)
         if normalized not in index:
             return
         index.pop(normalized, None)
@@ -245,3 +305,4 @@ def clear_all_users() -> None:
     client.delete_prefix("users/")
     client.delete_prefix("chats/")
     client.delete_blob(EMAIL_INDEX_PATH)
+    _invalidate_cached_index()

@@ -12,6 +12,7 @@ import * as authApi from "@/lib/auth-api";
 import { clearToken, getToken, setToken } from "@/lib/auth-storage";
 import { toast } from "@/lib/toast";
 import type { HealthProfile, User } from "@/lib/types";
+import { clearAllSessions } from "@/lib/chat-storage";
 
 interface AuthContextValue {
   user: User | null;
@@ -68,9 +69,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    const uid = user?.id ?? null;
     clearToken();
     setUser(null);
-  }, []);
+    if (typeof window !== "undefined") {
+      clearAllSessions(null);
+      if (uid) clearAllSessions(uid);
+    }
+  }, [user?.id]);
 
   const updateHealthProfile = useCallback(
     async (healthProfile: HealthProfile) => {
