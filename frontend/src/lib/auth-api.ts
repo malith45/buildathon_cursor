@@ -1,3 +1,4 @@
+import { parseApiError } from "./api-error";
 import { getToken } from "./auth-storage";
 import type { AuthResponse, HealthProfile, User } from "./types";
 
@@ -14,12 +15,7 @@ function authHeaders(): HeadersInit {
 
 async function parseError(res: Response): Promise<string> {
   const data = await res.json().catch(() => ({}));
-  const err = data as { error?: string; details?: Record<string, string[]> };
-  if (err.details) {
-    const first = Object.values(err.details).flat()[0];
-    if (first) return first;
-  }
-  return err.error ?? "Request failed";
+  return parseApiError(data);
 }
 
 export async function signup(

@@ -205,7 +205,7 @@ export default function HomeClient() {
               <AlertDescription>
                 Start the API:{" "}
                 <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-xs">
-                  cd backend &amp;&amp; npm run dev
+                  cd backend &amp;&amp; python -m uvicorn app.main:app --reload --port 4000
                 </code>
               </AlertDescription>
             </Alert>

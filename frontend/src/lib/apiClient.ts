@@ -1,3 +1,4 @@
+import { parseApiError } from "./api-error";
 import { DecisionRequest, HealthDecisionResponse } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -13,9 +14,7 @@ export async function postHealthDecision(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(
-      (data as { error?: string }).error ?? "Backend request failed"
-    );
+    throw new Error(parseApiError(data));
   }
 
   return res.json() as Promise<HealthDecisionResponse>;

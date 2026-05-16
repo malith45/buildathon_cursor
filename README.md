@@ -1,24 +1,25 @@
 # AI Health & Care Decision System
 
-Monorepo with a **Next.js frontend** and **Express (MVC) backend**. All AI uses the **Google Gemini API** on the backend only.
+Monorepo with a **Next.js frontend** and **Python FastAPI backend**. All AI uses the **Google Gemini API** on the backend only.
 
 ## Features
 
 - Symptom triage (urgency: self-care → emergency)
 - Personalized care suggestions and health education
-- Health profile stored in browser localStorage
-- Chat session history stored locally
+- User accounts (signup / login) with saved health profile
+- Chat session history stored in the browser
 
 ## Project structure
 
 ```
-frontend/     # Next.js UI (components, app, lib)
-backend/      # Express MVC + Gemini (routes → controllers → services)
+frontend/     # Next.js UI (shadcn, auth, consult flow)
+backend/      # FastAPI + Gemini (app/routers → services)
 ```
 
 ## Prerequisites
 
 - Node.js 18+
+- Python 3.11+
 - [Gemini API key](https://aistudio.google.com/apikey)
 
 ## Setup
@@ -29,15 +30,16 @@ backend/      # Express MVC + Gemini (routes → controllers → services)
 npm run install:all
 ```
 
-2. Configure backend — copy `backend/.env.example` to `backend/.env`:
+2. Backend — copy `backend/.env.example` to `backend/.env`:
 
 ```
 GEMINI_API_KEY=your_key_here
 PORT=4000
 CORS_ORIGIN=http://localhost:3000
+AUTH_SECRET=your-long-random-secret
 ```
 
-3. Configure frontend — copy `frontend/.env.example` to `frontend/.env.local`:
+3. Frontend — create `frontend/.env.local`:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:4000
@@ -49,8 +51,10 @@ Terminal 1 (backend):
 
 ```bash
 cd backend
-npm run dev
+python -m uvicorn app.main:app --reload --port 4000
 ```
+
+Or: `npm run dev` from `backend/` if you use the helper script.
 
 Terminal 2 (frontend):
 
@@ -61,10 +65,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Test backend
+
+```bash
+cd backend
+python -m pytest tests -q
+```
+
 ## API
 
-- `GET /api/health` — backend health check
-- `POST /api/health/decision` — body: `{ profile, messages }` → triage JSON
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| POST | `/api/health/decision` | Triage JSON `{ profile, messages }` |
+| POST | `/api/auth/signup` | Create account |
+| POST | `/api/auth/login` | Log in |
+| GET | `/api/auth/me` | Current user (Bearer token) |
+| PATCH | `/api/auth/profile` | Update name / health profile |
 
 ## Disclaimer
 
