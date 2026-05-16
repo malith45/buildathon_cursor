@@ -10,6 +10,7 @@ import {
 } from "react";
 import * as authApi from "@/lib/auth-api";
 import { clearToken, getToken, setToken } from "@/lib/auth-storage";
+import { toast } from "@/lib/toast";
 import type { HealthProfile, User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -41,6 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       clearToken();
       setUser(null);
+      if (token) {
+        toast.info("Session expired", "Please sign in again.");
+      }
     }
   }, []);
 

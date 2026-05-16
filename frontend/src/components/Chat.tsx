@@ -2,7 +2,6 @@
 
 import { ChatMessage } from "@/lib/types";
 import { sectionTitle } from "@/lib/ui";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,10 +27,9 @@ interface Props {
   messages: ChatMessage[];
   onSend: (text: string) => void;
   loading?: boolean;
-  error?: string | null;
 }
 
-export default function Chat({ messages, onSend, loading, error }: Props) {
+export default function Chat({ messages, onSend, loading }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,14 +103,6 @@ export default function Chat({ messages, onSend, loading, error }: Props) {
           </div>
         </ScrollArea>
 
-        {error && (
-          <Alert
-            variant="destructive"
-            className="mx-5 mb-2 border-coral/30 bg-coral/10"
-          >
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
       </CardContent>
 
       <CardFooter className="gap-3 border-t bg-card">

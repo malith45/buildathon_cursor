@@ -1,15 +1,11 @@
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
-
 from app.config import get_settings
+from app.db import user_repository
 from app.schemas.auth import PublicUser
 from app.schemas.health import HealthProfile
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.security.passwords import hash_password, verify_password
 
 DEFAULT_HEALTH_PROFILE = HealthProfile(
     ageRange="25-34",
@@ -26,27 +22,13 @@ class AuthError(Exception):
         self.status_code = status_code
 
 
-@dataclass
-class UserRecord:
-    id: str
-    email: str
-    password_hash: str
-    name: str
-    health_profile: HealthProfile
-    created_at: str
-
-
-_users_by_id: dict[str, UserRecord] = {}
-_users_by_email: dict[str, UserRecord] = {}
-
-
-def _to_public(user: UserRecord) -> PublicUser:
+def _to_public(record: dict) -> PublicUser:
     return PublicUser(
-        id=user.id,
-        email=user.email,
-        name=user.name,
-        healthProfile=user.health_profile,
-        createdAt=user.created_at,
+        id=record["id"],
+        email=record["email"],
+        name=record["name"],
+        healthProfile=record["health_profile"],
+        createdAt=record["created_at"],
     )
 
 
@@ -71,33 +53,29 @@ def verify_token(token: str) -> str:
 
 def signup(email: str, password: str, name: str) -> tuple[PublicUser, str]:
     normalized = email.strip().lower()
-    if normalized in _users_by_email:
+    if user_repository.find_by_email(normalized):
         raise AuthError("An account with this email already exists", 409)
 
-    user = UserRecord(
-        id=str(uuid4()),
+    record = user_repository.insert_user(
         email=normalized,
-        password_hash=pwd_context.hash(password),
+        password_hash=hash_password(password),
         name=name.strip(),
         health_profile=DEFAULT_HEALTH_PROFILE.model_copy(),
-        created_at=datetime.now(timezone.utc).isoformat(),
     )
-    _users_by_id[user.id] = user
-    _users_by_email[normalized] = user
-    return _to_public(user), _sign_token(user.id)
+    return _to_public(record), _sign_token(record["id"])
 
 
 def login(email: str, password: str) -> tuple[PublicUser, str]:
     normalized = email.strip().lower()
-    user = _users_by_email.get(normalized)
-    if not user or not pwd_context.verify(password, user.password_hash):
+    record = user_repository.find_by_email(normalized)
+    if not record or not verify_password(password, record["password_hash"]):
         raise AuthError("Invalid email or password", 401)
-    return _to_public(user), _sign_token(user.id)
+    return _to_public(record), _sign_token(record["id"])
 
 
 def get_user_by_id(user_id: str) -> PublicUser | None:
-    user = _users_by_id.get(user_id)
-    return _to_public(user) if user else None
+    record = user_repository.find_by_id(user_id)
+    return _to_public(record) if record else None
 
 
 def update_user_profile(
@@ -106,17 +84,16 @@ def update_user_profile(
     name: str | None = None,
     health_profile: HealthProfile | None = None,
 ) -> PublicUser:
-    user = _users_by_id.get(user_id)
-    if not user:
+    record = user_repository.update_user(
+        user_id,
+        name=name.strip() if name is not None else None,
+        health_profile=health_profile,
+    )
+    if not record:
         raise AuthError("User not found", 404)
-    if name is not None:
-        user.name = name.strip()
-    if health_profile is not None:
-        user.health_profile = health_profile
-    return _to_public(user)
+    return _to_public(record)
 
 
 def clear_users_for_tests() -> None:
-    """Reset in-memory store (tests only)."""
-    _users_by_id.clear()
-    _users_by_email.clear()
+    """Reset store (tests only, requires database)."""
+    user_repository.clear_all_users()

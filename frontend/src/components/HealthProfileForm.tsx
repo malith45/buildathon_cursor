@@ -4,6 +4,7 @@ import { HealthProfile } from "@/lib/types";
 import { sectionSubtitle, sectionTitle } from "@/lib/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DiseaseMultiSelect from "@/components/DiseaseMultiSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -102,19 +103,10 @@ export default function HealthProfileForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="conditions">Chronic conditions</Label>
-          <Input
+          <DiseaseMultiSelect
             id="conditions"
-            value={profile.conditions.join(", ")}
-            onChange={(e) =>
-              update({
-                conditions: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="e.g. asthma, diabetes"
+            value={profile.conditions}
+            onChange={(conditions) => update({ conditions })}
           />
         </div>
 

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeNavigate } from "@/lib/navigation";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { errorMessage, toast } from "@/lib/toast";
 import {
   Card,
   CardContent,
@@ -21,12 +21,10 @@ import { Loader2 } from "lucide-react";
 export default function SignupForm() {
   const navigate = useSafeNavigate();
   const { signup } = useAuth();
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
     const name = String(form.get("name") ?? "");
@@ -34,9 +32,10 @@ export default function SignupForm() {
     const password = String(form.get("password") ?? "");
     try {
       await signup(email, password, name);
+      toast.success("Account created", "Complete your health profile next.");
       navigate("/profile");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed");
+      toast.error("Sign up failed", errorMessage(err, "Could not create account"));
     } finally {
       setSubmitting(false);
     }
@@ -51,12 +50,7 @@ export default function SignupForm() {
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+        <CardContent className="space-y-4 pb-6">
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>
             <Input
@@ -91,7 +85,7 @@ export default function SignupForm() {
             />
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4 border-t bg-muted/30">
+        <CardFooter className="flex flex-col gap-4 border-t bg-muted/30 pt-6">
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting && <Loader2 className="size-4 animate-spin" />}
             Create account

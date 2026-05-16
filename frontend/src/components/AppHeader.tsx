@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSafeNavigate } from "@/lib/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 import { Activity, LogOut, User } from "lucide-react";
 
 const NAV = [
@@ -20,6 +21,7 @@ export default function AppHeader() {
 
   function handleLogout() {
     logout();
+    toast.info("Signed out");
     if (pathname !== "/") {
       navigate("/", { replace: true });
     }

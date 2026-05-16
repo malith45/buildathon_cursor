@@ -6,7 +6,8 @@ import DisclaimerBanner from "@/components/DisclaimerBanner";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import SessionList from "@/components/SessionList";
 import TriageCard from "@/components/TriageCard";
-import { checkBackendHealth, postHealthDecision } from "@/lib/apiClient";
+import { postHealthDecision } from "@/lib/apiClient";
+import SystemStatusPanel from "@/components/SystemStatusPanel";
 import {
   createSession,
   loadSessions,
@@ -24,11 +25,11 @@ import {
   HealthProfile,
 } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { errorMessage, toast } from "@/lib/toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 export default function HomeClient() {
@@ -39,14 +40,7 @@ export default function HomeClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [backendOk, setBackendOk] = useState<boolean | null>(null);
-
   const userId = user?.id ?? null;
-
-  useEffect(() => {
-    checkBackendHealth().then(setBackendOk);
-  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -69,8 +63,11 @@ export default function HomeClient() {
       setProfile(next);
       saveProfile(next, userId);
       if (user) {
-        void updateHealthProfile(next).catch(() => {
-          /* keep local state; user can save from /profile */
+        void updateHealthProfile(next).catch((err) => {
+          toast.warning(
+            "Profile not synced",
+            errorMessage(err, "Save from your profile page when online.")
+          );
         });
       }
     },
@@ -92,7 +89,6 @@ export default function HomeClient() {
       setActiveId(id);
       setMessages(session.messages);
       setDecision(session.lastDecision ?? null);
-      setError(null);
     },
     [sessions]
   );
@@ -101,18 +97,20 @@ export default function HomeClient() {
     setActiveId(null);
     setMessages([]);
     setDecision(null);
-    setError(null);
+    toast.info("New chat started");
   }, []);
 
   const handleClearHistory = useCallback(() => {
     clearAllSessions(userId);
     setSessions([]);
-    startNewSession();
-  }, [startNewSession, userId]);
+    setActiveId(null);
+    setMessages([]);
+    setDecision(null);
+    toast.success("Chat history cleared");
+  }, [userId]);
 
   const handleSend = useCallback(
     async (text: string) => {
-      setError(null);
       setLoading(true);
 
       let session = activeSession;
@@ -141,11 +139,19 @@ export default function HomeClient() {
 
         const updated = updateSessionMessages(session, withReply, result);
         persistSessions(upsertSession(sessions, updated));
+        if (result.fallback) {
+          toast.warning(
+            "Limited AI response",
+            "Using safe fallback guidance. Check Gemini status in the header."
+          );
+        }
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to reach the backend. Is it running on port 4000?"
+        toast.error(
+          "Could not get guidance",
+          errorMessage(
+            err,
+            "Failed to reach the backend. Is it running on port 4000?"
+          )
         );
       } finally {
         setLoading(false);
@@ -175,41 +181,8 @@ export default function HomeClient() {
                 by Gemini on a secure backend.
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className={cn(
-                "gap-2 px-3 py-1.5",
-                backendOk === false &&
-                  "border-coral/40 bg-coral/10 text-coral",
-                backendOk === true && "border-mint/40 bg-mint/10"
-              )}
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full",
-                  backendOk === false && "bg-coral",
-                  backendOk === true && "bg-mint",
-                  backendOk === null && "animate-pulse bg-muted-foreground/40"
-                )}
-              />
-              {backendOk === false
-                ? "Backend offline"
-                : backendOk === true
-                  ? "Connected"
-                  : "Checking…"}
-            </Badge>
+            <SystemStatusPanel />
           </div>
-
-          {backendOk === false && (
-            <Alert variant="destructive" className="border-coral/30 bg-coral/10">
-              <AlertDescription>
-                Start the API:{" "}
-                <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-xs">
-                  cd backend &amp;&amp; python -m uvicorn app.main:app --reload --port 4000
-                </code>
-              </AlertDescription>
-            </Alert>
-          )}
 
           <DisclaimerBanner />
 
@@ -259,7 +232,6 @@ export default function HomeClient() {
             messages={messages}
             onSend={handleSend}
             loading={loading}
-            error={error}
           />
         </div>
         <div className="lg:col-span-3">

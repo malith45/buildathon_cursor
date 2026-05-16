@@ -8,6 +8,7 @@ from app.schemas.health import (
     HealthProfile,
     UrgencyLevel,
 )
+from app.config import get_settings
 from app.services import gemini_service
 
 URGENCY_VALUES: set[str] = {
@@ -92,13 +93,24 @@ def _parse_decision(raw: str) -> HealthDecisionResponse | None:
 def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisionResponse:
     user_content = _build_user_content(profile, messages)
 
-    for _ in range(2):
+    settings = get_settings()
+    retries = max(1, settings.GEMINI_DECISION_RETRIES)
+    last_error: Exception | None = None
+    for _ in range(retries):
         try:
             raw = gemini_service.generate_json(SYSTEM_PROMPT, user_content)
             decision = _parse_decision(raw)
             if decision:
                 return decision
-        except Exception:
+        except Exception as exc:
+            last_error = exc
             continue
 
-    return FALLBACK_DECISION.model_copy()
+    fallback = FALLBACK_DECISION.model_copy()
+    if last_error and gemini_service.is_quota_error(last_error):
+        fallback.summary = (
+            "Gemini API quota is exceeded on the free tier (429), so this is "
+            "generic guidance only. Wait a few minutes or check billing at "
+            "Google AI Studio, then try again."
+        )
+    return fallback

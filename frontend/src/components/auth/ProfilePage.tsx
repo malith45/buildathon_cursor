@@ -6,7 +6,7 @@ import AuthGuard from "@/components/AuthGuard";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_PROFILE, type HealthProfile } from "@/lib/types";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { errorMessage, toast } from "@/lib/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 function ProfileContent() {
   const { user, updateName, updateHealthProfile } = useAuth();
@@ -26,8 +26,6 @@ function ProfileContent() {
   const [healthProfile, setHealthProfile] =
     useState<HealthProfile>(DEFAULT_PROFILE);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -39,17 +37,17 @@ function ProfileContent() {
   async function handleSave() {
     if (!user) return;
     setSaving(true);
-    setError(null);
-    setSaved(false);
     try {
       if (name.trim() !== user.name) {
         await updateName(name.trim());
       }
       await updateHealthProfile(healthProfile);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      toast.success("Profile saved", "Your health context is up to date.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save profile");
+      toast.error(
+        "Could not save profile",
+        errorMessage(err, "Please try again.")
+      );
     } finally {
       setSaving(false);
     }
@@ -103,19 +101,6 @@ function ProfileContent() {
         profile={healthProfile}
         onChange={setHealthProfile}
       />
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {saved && (
-        <Alert className="border-mint/40 bg-mint/10">
-          <CheckCircle2 className="text-mint" />
-          <AlertDescription>Profile saved successfully.</AlertDescription>
-        </Alert>
-      )}
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={handleSave} disabled={saving} size="lg">

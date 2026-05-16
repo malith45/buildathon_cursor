@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 os.environ.setdefault("AUTH_SECRET", "test-secret")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
@@ -8,17 +9,46 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
+from app.db.connection import ping_database
 from app.main import app
 from app.services import auth_service
 
 client = TestClient(app)
 
 
+@lru_cache
+def _database_reachable() -> bool:
+    settings = get_settings()
+    if not settings.database_configured:
+        return False
+    try:
+        ping_database()
+        return True
+    except Exception:
+        return False
+
+
 @pytest.fixture(autouse=True)
 def clear_users():
-    auth_service.clear_users_for_tests()
+    if not _database_reachable():
+        yield
+        return
+    try:
+        auth_service.clear_users_for_tests()
+    except Exception:
+        pass
     yield
-    auth_service.clear_users_for_tests()
+    try:
+        auth_service.clear_users_for_tests()
+    except Exception:
+        pass
+
+
+requires_db = pytest.mark.skipif(
+    not _database_reachable(),
+    reason="DATABASE_* not configured or Supabase unreachable",
+)
 
 
 def test_health_check():
@@ -27,8 +57,38 @@ def test_health_check():
     data = res.json()
     assert data["status"] == "ok"
     assert "geminiConfigured" in data
+    assert "databaseConfigured" in data
+    assert "databaseConnected" in data
 
 
+@requires_db
+def test_diseases_search():
+    from app.db.seed_diseases import seed_diseases_if_needed
+
+    seed_diseases_if_needed()
+    res = client.get("/api/diseases?search=asthma")
+    assert res.status_code == 200
+    diseases = res.json()["diseases"]
+    assert any(d["name"] == "Asthma" for d in diseases)
+
+
+@patch("app.services.gemini_service.probe_gemini")
+def test_health_check_gemini_probe(mock_probe):
+    mock_probe.return_value = {
+        "configured": True,
+        "working": True,
+        "message": "Connected via gemini-2.5-flash",
+        "model": "gemini-2.5-flash",
+        "sample": "OK",
+    }
+    res = client.get("/api/health?probe=true")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["gemini"]["working"] is True
+    mock_probe.assert_called_once()
+
+
+@requires_db
 def test_signup_login_me_profile():
     signup = client.post(
         "/api/auth/signup",

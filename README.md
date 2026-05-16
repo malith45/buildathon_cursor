@@ -34,10 +34,34 @@ npm run install:all
 
 ```
 GEMINI_API_KEY=your_key_here
+AUTH_SECRET=your-long-random-secret
 PORT=4000
 CORS_ORIGIN=http://localhost:3000
-AUTH_SECRET=your-long-random-secret
+
+DATABASE_HOST=your-project.pooler.supabase.com
+DATABASE_PORT=5432
+DATABASE_NAME=postgres
+DATABASE_USER=postgres.your_project_ref
+DATABASE_PASSWORD=your_db_password
 ```
+
+**Supabase connection failed on startup?**
+
+1. In [Supabase](https://supabase.com/dashboard) → your project → **Database** → **Connect**, copy the **Session pooler** URI (port **5432**).
+2. Add to `backend/.env` as one line (URL-encode special characters in the password):
+
+```
+DATABASE_URL=postgresql://postgres.YOUR_REF:YOUR_PASSWORD@aws-1-REGION.pooler.supabase.com:5432/postgres
+```
+
+3. Test: `cd backend && python scripts/test_db.py` — should print `Ping OK`.
+4. Restart: `npm run dev`.
+
+If your network blocks port 5432, try another network or confirm the project is not **paused**. To run without DB temporarily: `DATABASE_ENABLED=false` (auth and disease search will not work).
+
+4. **Diseases table** — on first backend start the API creates `public.diseases` and seeds 120+ conditions. If the table is missing in Supabase, either:
+   - Run `cd backend && npm run db:init`, or
+   - Paste and run `backend/supabase/schema.sql` in **Supabase → SQL Editor**
 
 3. Frontend — create `frontend/.env.local`:
 
@@ -69,8 +93,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 cd backend
+pip install -r requirements.txt
 python -m pytest tests -q
 ```
+
+## Backend troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `Database schema init failed` / Supabase timeout | Set `DATABASE_ENABLED=false` for local dev, or fix pooler host/password in `.env` |
+| `FutureWarning` for `google.generativeai` | Use `pip install -r requirements.txt` (uses `google-genai` SDK) |
+| Port 4000 in use | Stop the other process or change `PORT` in `.env` |
 
 ## API
 
