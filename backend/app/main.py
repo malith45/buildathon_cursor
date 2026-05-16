@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.db.connection import init_schema
 from app.db.errors import is_database_unavailable
-from app.routers import auth, diseases, health
+from app.routers import auth, chats, diseases, health
 from app.startup_checks import log_startup_connections
 
 
@@ -84,6 +84,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(diseases.router, prefix="/api")
+app.include_router(chats.router, prefix="/api")
 
 
 @app.exception_handler(HTTPException)

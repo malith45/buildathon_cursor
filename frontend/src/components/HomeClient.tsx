@@ -7,6 +7,11 @@ import HealthProfileForm from "@/components/HealthProfileForm";
 import SessionList from "@/components/SessionList";
 import TriageCard from "@/components/TriageCard";
 import { postHealthDecision } from "@/lib/apiClient";
+import {
+  clearChatSessions,
+  fetchChatSessions,
+  syncChatSessions,
+} from "@/lib/chats-api";
 import SystemStatusPanel from "@/components/SystemStatusPanel";
 import {
   createSession,
@@ -44,16 +49,49 @@ export default function HomeClient() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (user) {
-      setProfile(user.healthProfile);
-      setSessions(loadSessions(user.id));
-    } else {
-      setProfile(loadProfile());
-      setSessions(loadSessions());
+    let cancelled = false;
+
+    async function load() {
+      if (user) {
+        setProfile(user.healthProfile);
+        const local = loadSessions(user.id);
+        try {
+          let remote = await fetchChatSessions();
+          if (remote.length === 0 && local.length > 0) {
+            remote = await syncChatSessions(local);
+            toast.success(
+              "Chats synced",
+              "Your local history was saved to your account."
+            );
+          }
+          if (!cancelled) {
+            setSessions(remote);
+            saveSessions(remote, user.id);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setSessions(local);
+            toast.warning(
+              "Could not load chats from server",
+              errorMessage(err, "Showing local history only.")
+            );
+          }
+        }
+      } else {
+        setProfile(loadProfile());
+        if (!cancelled) setSessions(loadSessions());
+      }
+      if (!cancelled) {
+        setActiveId(null);
+        setMessages([]);
+        setDecision(null);
+      }
     }
-    setActiveId(null);
-    setMessages([]);
-    setDecision(null);
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [user, authLoading]);
 
   const activeSession = sessions.find((s) => s.id === activeId) ?? null;
@@ -75,9 +113,20 @@ export default function HomeClient() {
   );
 
   const persistSessions = useCallback(
-    (next: ChatSession[]) => {
+    async (next: ChatSession[]) => {
       setSessions(next);
       saveSessions(next, userId);
+      if (!userId) return;
+      try {
+        const saved = await syncChatSessions(next);
+        setSessions(saved);
+        saveSessions(saved, userId);
+      } catch (err) {
+        toast.warning(
+          "Chat not saved online",
+          errorMessage(err, "Saved on this device only. Check database connection.")
+        );
+      }
     },
     [userId]
   );
@@ -106,6 +155,14 @@ export default function HomeClient() {
     setActiveId(null);
     setMessages([]);
     setDecision(null);
+    if (userId) {
+      void clearChatSessions().catch((err) => {
+        toast.warning(
+          "Server history not cleared",
+          errorMessage(err, "Cleared on this device only.")
+        );
+      });
+    }
     toast.success("Chat history cleared");
   }, [userId]);
 
@@ -138,7 +195,7 @@ export default function HomeClient() {
         setDecision(result);
 
         const updated = updateSessionMessages(session, withReply, result);
-        persistSessions(upsertSession(sessions, updated));
+        await persistSessions(upsertSession(sessions, updated));
         if (result.fallback) {
           toast.warning(
             "Limited AI response",
@@ -190,8 +247,8 @@ export default function HomeClient() {
             <Alert className="border-primary/30 bg-primary/5">
               <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
                 <span>
-                  Log in to save your health profile and chat history to your
-                  account.
+                  Log in to save your health profile and chat history to
+                  Supabase.
                 </span>
                 <Link href="/login" className={buttonVariants({ size: "sm" })}>
                   Log in

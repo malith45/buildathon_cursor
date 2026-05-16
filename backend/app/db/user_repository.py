@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.config import get_settings
 from app.db.connection import dict_cursor, get_connection
 from app.schemas.health import HealthProfile
 
@@ -111,6 +112,13 @@ def update_user(
 
 def clear_all_users() -> None:
     """Tests only."""
+    settings = get_settings()
+    app_env = settings.APP_ENV.strip().lower()
+    if app_env != "test" or not settings.ALLOW_TEST_DATA_RESET:
+        raise RuntimeError(
+            "Refusing destructive reset outside test mode. "
+            "Set APP_ENV=test and ALLOW_TEST_DATA_RESET=true for isolated test DB only."
+        )
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("TRUNCATE public.chat_sessions, public.users CASCADE")

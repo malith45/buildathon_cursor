@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     PORT: int = 4000
     CORS_ORIGIN: str = "http://localhost:3000"
     AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
+    APP_ENV: str = "development"
+    # Hard safety switch: destructive DB reset for tests only.
+    ALLOW_TEST_DATA_RESET: bool = False
 
     # Set false to run without Supabase (health/decision still work; auth/DB features off)
     DATABASE_ENABLED: bool = True

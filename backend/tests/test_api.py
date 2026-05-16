@@ -84,6 +84,97 @@ def test_health_check_gemini_probe(mock_probe):
 
 
 @requires_db
+def test_chat_sessions_sync():
+    signup = client.post(
+        "/api/auth/signup",
+        json={
+            "email": "chat-sync@example.com",
+            "password": "password123",
+            "name": "Chat User",
+        },
+    )
+    assert signup.status_code == 201
+    token = signup.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    session = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "head aches, stomach ache…",
+        "messages": [
+            {"role": "user", "text": "head aches for 2 days"},
+            {"role": "model", "text": "Seek medical evaluation."},
+        ],
+        "lastDecision": {
+            "urgency": "urgent_care",
+            "summary": "Seek medical evaluation.",
+            "careSteps": ["Visit urgent care"],
+            "education": ["Stay hydrated"],
+            "redFlags": ["Severe dehydration"],
+            "disclaimer": "Educational only.",
+        },
+        "updatedAt": "2026-05-16T21:17:43.000Z",
+    }
+
+    sync = client.put(
+        "/api/chats",
+        headers=headers,
+        json={"sessions": [session]},
+    )
+    assert sync.status_code == 200
+    listed = client.get("/api/chats", headers=headers)
+    assert listed.status_code == 200
+    sessions = listed.json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["title"].startswith("head aches")
+
+    cleared = client.delete("/api/chats", headers=headers)
+    assert cleared.status_code == 204
+
+
+@requires_db
+def test_chat_sessions_sync_does_not_delete_others():
+    signup = client.post(
+        "/api/auth/signup",
+        json={
+            "email": "chat-merge@example.com",
+            "password": "password123",
+            "name": "Chat Merge User",
+        },
+    )
+    assert signup.status_code == 201
+    token = signup.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    base = {
+        "messages": [{"role": "user", "text": "hello"}, {"role": "model", "text": "hi"}],
+        "lastDecision": {
+            "urgency": "self_care",
+            "summary": "ok",
+            "careSteps": ["step"],
+            "education": ["edu"],
+            "redFlags": ["flag"],
+            "disclaimer": "Educational only.",
+        },
+        "updatedAt": "2026-05-16T21:20:00.000Z",
+    }
+
+    s1 = {"id": "11111111-1111-4111-8111-111111111111", "title": "Session 1", **base}
+    s2 = {"id": "22222222-2222-4222-8222-222222222222", "title": "Session 2", **base}
+    s3 = {"id": "33333333-3333-4333-8333-333333333333", "title": "Session 3", **base}
+
+    first = client.put("/api/chats", headers=headers, json={"sessions": [s1, s2]})
+    assert first.status_code == 200
+
+    second = client.put("/api/chats", headers=headers, json={"sessions": [s3]})
+    assert second.status_code == 200
+
+    listed = client.get("/api/chats", headers=headers)
+    assert listed.status_code == 200
+    ids = {s["id"] for s in listed.json()["sessions"]}
+    assert ids == {s1["id"], s2["id"], s3["id"]}
+
+
+@requires_db
 def test_signup_login_me_profile():
     signup = client.post(
         "/api/auth/signup",

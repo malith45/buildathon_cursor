@@ -7,6 +7,8 @@ from unittest.mock import patch
 os.environ["GEMINI_PROBE_ON_STARTUP"] = "false"
 os.environ.setdefault("AUTH_SECRET", "test-secret")
 os.environ["GEMINI_API_KEY"] = "test-key-no-live-api"
+os.environ["APP_ENV"] = "test"
+os.environ["ALLOW_TEST_DATA_RESET"] = "true"
 
 _MOCK_PROBE = {
     "configured": True,
