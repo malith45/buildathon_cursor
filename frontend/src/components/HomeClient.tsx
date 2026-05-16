@@ -23,6 +23,10 @@ import {
   HealthDecisionResponse,
   HealthProfile,
 } from "@/lib/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function HomeClient() {
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
@@ -123,60 +127,64 @@ export default function HomeClient() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="overflow-hidden rounded-2xl border border-line/70 bg-white p-6 shadow-[var(--shadow-card)] sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-              <span className="h-1.5 w-1.5 rounded-full bg-mint" aria-hidden />
-              Calm Wellness · AI guidance
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-              Health &amp; Care Decision System
-            </h1>
-            <p className="max-w-xl text-sm leading-relaxed text-stone">
-              Thoughtful triage guidance, care steps, and education — powered by
-              Gemini on a secure backend.
-            </p>
-          </div>
-          <div
-            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
-              backendOk === false
-                ? "border-coral/40 bg-coral/10 text-coral"
+      <Card className="overflow-hidden border-line/70 shadow-[var(--shadow-card)]">
+        <CardContent className="space-y-5 p-6 sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-3">
+              <Badge
+                variant="secondary"
+                className="gap-2 rounded-full bg-primary/10 px-3 py-1 text-brand hover:bg-primary/10"
+              >
+                <span className="size-1.5 rounded-full bg-mint" aria-hidden />
+                Calm Wellness · AI guidance
+              </Badge>
+              <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+                Health &amp; Care Decision System
+              </h1>
+              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                Thoughtful triage guidance, care steps, and education — powered
+                by Gemini on a secure backend.
+              </p>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "gap-2 px-3 py-1.5",
+                backendOk === false &&
+                  "border-coral/40 bg-coral/10 text-coral",
+                backendOk === true && "border-mint/40 bg-mint/10"
+              )}
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full",
+                  backendOk === false && "bg-coral",
+                  backendOk === true && "bg-mint",
+                  backendOk === null && "animate-pulse bg-muted-foreground/40"
+                )}
+              />
+              {backendOk === false
+                ? "Backend offline"
                 : backendOk === true
-                  ? "border-mint/40 bg-mint/10 text-ink"
-                  : "border-line bg-sand text-stone"
-            }`}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                backendOk === false
-                  ? "bg-coral"
-                  : backendOk === true
-                    ? "bg-mint"
-                    : "animate-pulse bg-stone/40"
-              }`}
-            />
-            {backendOk === false
-              ? "Backend offline"
-              : backendOk === true
-                ? "Connected"
-                : "Checking…"}
+                  ? "Connected"
+                  : "Checking…"}
+            </Badge>
           </div>
-        </div>
 
-        {backendOk === false && (
-          <p className="mt-4 rounded-xl border border-coral/30 bg-coral/10 px-4 py-3 text-sm text-ink">
-            Start the API:{" "}
-            <code className="rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-xs">
-              cd backend &amp;&amp; npm run dev
-            </code>
-          </p>
-        )}
+          {backendOk === false && (
+            <Alert variant="destructive" className="border-coral/30 bg-coral/10">
+              <AlertDescription>
+                Start the API:{" "}
+                <code className="rounded-md bg-card px-1.5 py-0.5 font-mono text-xs">
+                  cd backend &amp;&amp; npm run dev
+                </code>
+              </AlertDescription>
+            </Alert>
+          )}
 
-        <div className="mt-5">
           <DisclaimerBanner />
-        </div>
-      </header>
+        </CardContent>
+      </Card>
 
       <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5">
         <div className="lg:col-span-2">

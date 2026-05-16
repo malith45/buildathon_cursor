@@ -1,7 +1,19 @@
 "use client";
 
 import { HealthProfile } from "@/lib/types";
-import { card, input, sectionSubtitle, sectionTitle } from "@/lib/ui";
+import { sectionSubtitle, sectionTitle } from "@/lib/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   profile: HealthProfile;
@@ -23,104 +35,102 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
     onChange({ ...profile, ...partial });
 
   return (
-    <section className={`${card} space-y-4 p-5`}>
-      <div className="border-b border-line/60 pb-4">
+    <Card className="shadow-[var(--shadow-card)]">
+      <CardHeader className="border-b">
         <p className={sectionSubtitle}>Context</p>
-        <h2 className={sectionTitle}>Health profile</h2>
-        <p className="mt-1 text-xs text-stone">
-          Helps tailor guidance to you.
-        </p>
-      </div>
+        <CardTitle className={sectionTitle}>Health profile</CardTitle>
+        <CardDescription>Helps tailor guidance to you.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="age-range">Age range</Label>
+          <Select
+            value={profile.ageRange}
+            onValueChange={(value) => {
+              if (value) update({ ageRange: value });
+            }}
+          >
+            <SelectTrigger id="age-range" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AGE_RANGES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <label className="block text-sm">
-        <span className="mb-1.5 block text-xs font-medium text-stone">
-          Age range
-        </span>
-        <select
-          className={input}
-          value={profile.ageRange}
-          onChange={(e) => update({ ageRange: e.target.value })}
-        >
-          {AGE_RANGES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="space-y-2">
+          <Label htmlFor="sex">Sex (optional)</Label>
+          <Input
+            id="sex"
+            value={profile.sex ?? ""}
+            onChange={(e) => update({ sex: e.target.value || undefined })}
+            placeholder="e.g. female, male"
+          />
+        </div>
 
-      <label className="block text-sm">
-        <span className="mb-1.5 block text-xs font-medium text-stone">
-          Sex (optional)
-        </span>
-        <input
-          className={input}
-          value={profile.sex ?? ""}
-          onChange={(e) => update({ sex: e.target.value || undefined })}
-          placeholder="e.g. female, male"
-        />
-      </label>
+        <div className="space-y-2">
+          <Label htmlFor="conditions">Chronic conditions</Label>
+          <Input
+            id="conditions"
+            value={profile.conditions.join(", ")}
+            onChange={(e) =>
+              update({
+                conditions: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="e.g. asthma, diabetes"
+          />
+        </div>
 
-      <label className="block text-sm">
-        <span className="mb-1.5 block text-xs font-medium text-stone">
-          Chronic conditions
-        </span>
-        <input
-          className={input}
-          value={profile.conditions.join(", ")}
-          onChange={(e) =>
-            update({
-              conditions: e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
-          placeholder="e.g. asthma, diabetes"
-        />
-      </label>
+        <div className="space-y-2">
+          <Label htmlFor="allergies">Allergies</Label>
+          <Input
+            id="allergies"
+            value={profile.allergies.join(", ")}
+            onChange={(e) =>
+              update({
+                allergies: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="e.g. penicillin"
+          />
+        </div>
 
-      <label className="block text-sm">
-        <span className="mb-1.5 block text-xs font-medium text-stone">
-          Allergies
-        </span>
-        <input
-          className={input}
-          value={profile.allergies.join(", ")}
-          onChange={(e) =>
-            update({
-              allergies: e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
-          placeholder="e.g. penicillin"
-        />
-      </label>
+        <div className="space-y-2">
+          <Label htmlFor="medications">Medications</Label>
+          <Textarea
+            id="medications"
+            rows={2}
+            value={profile.medications}
+            onChange={(e) => update({ medications: e.target.value })}
+            placeholder="List any medications you take"
+          />
+        </div>
 
-      <label className="block text-sm">
-        <span className="mb-1.5 block text-xs font-medium text-stone">
-          Medications
-        </span>
-        <textarea
-          className={input}
-          rows={2}
-          value={profile.medications}
-          onChange={(e) => update({ medications: e.target.value })}
-          placeholder="List any medications you take"
-        />
-      </label>
-
-      <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line/60 bg-canvas px-3 py-2.5 text-sm">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-line text-brand accent-[#5b6cff]"
-          checked={!!profile.pregnant}
-          onChange={(e) => update({ pregnant: e.target.checked })}
-        />
-        Currently pregnant
-      </label>
-    </section>
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3">
+          <Checkbox
+            id="pregnant"
+            checked={!!profile.pregnant}
+            onCheckedChange={(checked) =>
+              update({ pregnant: checked === true })
+            }
+          />
+          <Label htmlFor="pregnant" className="cursor-pointer font-normal">
+            Currently pregnant
+          </Label>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,8 +1,22 @@
 "use client";
 
 import { ChatMessage } from "@/lib/types";
-import { btnPrimary, card, cardHeader, input, sectionTitle } from "@/lib/ui";
+import { sectionTitle } from "@/lib/ui";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { FormEvent, useRef, useEffect } from "react";
+import { Loader2, Send } from "lucide-react";
 
 const STARTERS = [
   "Fever and sore throat for 2 days",
@@ -34,84 +48,93 @@ export default function Chat({ messages, onSend, loading, error }: Props) {
   }
 
   return (
-    <section className={`${card} flex min-h-[480px] flex-col`}>
-      <div className={cardHeader}>
-        <h2 className={sectionTitle}>Symptom chat</h2>
-        <p className="mt-0.5 text-xs text-stone">
+    <Card className="flex min-h-[480px] flex-col shadow-[var(--shadow-card)]">
+      <CardHeader className="border-b">
+        <CardTitle className={sectionTitle}>Symptom chat</CardTitle>
+        <CardDescription>
           Describe how you feel — we&apos;ll suggest next steps.
-        </p>
-      </div>
+        </CardDescription>
+      </CardHeader>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-canvas/50 p-5">
-        {messages.length === 0 && (
-          <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-stone">
-              Share your symptoms in your own words. The more context you give,
-              the better the guidance.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {STARTERS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => onSend(s)}
-                  className="rounded-full border border-line bg-white px-3 py-1.5 text-left text-xs text-ink transition hover:border-brand/40 hover:bg-brand/5 disabled:opacity-50"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+        <ScrollArea className="min-h-[320px] flex-1 bg-canvas/50">
+          <div className="space-y-3 p-5">
+            {messages.length === 0 && (
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Share your symptoms in your own words. The more context you
+                  give, the better the guidance.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {STARTERS.map((s) => (
+                    <Button
+                      key={s}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={loading}
+                      className="h-auto rounded-full px-3 py-1.5 text-left text-xs font-normal"
+                      onClick={() => onSend(s)}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                  m.role === "user"
+                    ? "ml-auto bg-primary text-primary-foreground"
+                    : "border bg-card text-card-foreground"
+                )}
+              >
+                {m.text}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin text-primary" />
+                Getting guidance…
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
-        )}
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-              m.role === "user"
-                ? "ml-auto bg-brand text-white"
-                : "border border-line/60 bg-white text-ink"
-            }`}
+        </ScrollArea>
+
+        {error && (
+          <Alert
+            variant="destructive"
+            className="mx-5 mb-2 border-coral/30 bg-coral/10"
           >
-            {m.text}
-          </div>
-        ))}
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-stone">
-            <span className="inline-flex gap-1">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-brand [animation-delay:0ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-brand [animation-delay:150ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-brand [animation-delay:300ms]" />
-            </span>
-            Getting guidance…
-          </div>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-        <div ref={bottomRef} />
-      </div>
+      </CardContent>
 
-      {error && (
-        <p className="mx-5 mb-2 rounded-xl border border-coral/30 bg-coral/10 px-4 py-2.5 text-sm text-ink">
-          {error}
-        </p>
-      )}
-
-      <form
-        onSubmit={handleSubmit}
-        className="flex gap-3 border-t border-line/60 bg-white p-5"
-      >
-        <input
-          ref={inputRef}
-          name="message"
-          type="text"
-          disabled={loading}
-          placeholder="Type your message…"
-          className={input}
-          autoComplete="off"
-        />
-        <button type="submit" disabled={loading} className={btnPrimary}>
-          Send
-        </button>
-      </form>
-    </section>
+      <CardFooter className="gap-3 border-t bg-card">
+        <form onSubmit={handleSubmit} className="flex w-full gap-3">
+          <Input
+            ref={inputRef}
+            name="message"
+            disabled={loading}
+            placeholder="Type your message…"
+            className="flex-1"
+            autoComplete="off"
+          />
+          <Button type="submit" disabled={loading} size="lg">
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            Send
+          </Button>
+        </form>
+      </CardFooter>
+    </Card>
   );
 }
