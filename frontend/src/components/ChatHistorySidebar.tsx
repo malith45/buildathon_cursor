@@ -1,16 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ChatSession } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  LogIn,
   MessageSquare,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Sliders,
   Trash2,
+  User as UserIcon,
 } from "lucide-react";
 
 const STORAGE_KEY = "mediassist_chat_sidebar_expanded";
@@ -21,6 +25,16 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onClear: () => void;
+  user?: { name: string; email: string } | null;
+  profileSummary?: string;
+  onOpenProfile?: () => void;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 type GroupKey = "today" | "yesterday" | "thisWeek" | "earlier";
@@ -69,6 +83,9 @@ export default function ChatHistorySidebar({
   onSelect,
   onNew,
   onClear,
+  user = null,
+  profileSummary = "",
+  onOpenProfile,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -303,6 +320,84 @@ export default function ChatHistorySidebar({
           )}
         </div>
       )}
+
+      {/* "You" footer — profile quick-edit chip (signed in) or sign-in CTA (guest) */}
+      <div
+        className={cn(
+          "shrink-0 border-t border-line/60 bg-card/60",
+          expanded ? "p-2" : "flex flex-col items-center px-1 py-2"
+        )}
+      >
+        {user ? (
+          expanded ? (
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="group/me flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
+              aria-label="Edit health profile"
+              title="Edit health profile"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
+                {initials(user.name)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium leading-tight">
+                  {user.name}
+                </span>
+                {profileSummary && (
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {profileSummary}
+                  </span>
+                )}
+              </span>
+              <Sliders className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/me:text-foreground" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              aria-label={`Edit health profile (${user.name})`}
+              title={user.name}
+              className="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-hidden"
+            >
+              <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
+                {initials(user.name)}
+              </span>
+            </button>
+          )
+        ) : expanded ? (
+          <Link
+            href="/login"
+            className="group/guest flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
+            title="Sign in to save chats"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <UserIcon className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight">
+                Guest
+              </span>
+              <span className="block text-[11px] text-muted-foreground">
+                Sign in to save chats
+              </span>
+            </span>
+            <LogIn className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/guest:text-foreground" />
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "icon-sm" }),
+              "text-muted-foreground hover:text-foreground"
+            )}
+            aria-label="Sign in"
+            title="Sign in"
+          >
+            <UserIcon className="size-4" />
+          </Link>
+        )}
+      </div>
     </aside>
   );
 }

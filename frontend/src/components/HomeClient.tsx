@@ -32,9 +32,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage, toast } from "@/lib/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { APP_NAME } from "@/lib/brand";
 import Link from "next/link";
-import { ChevronRight, Sliders, Sparkles, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 
 export default function HomeClient() {
   const { user, loading: authLoading, updateHealthProfile } = useAuth();
@@ -221,7 +220,7 @@ export default function HomeClient() {
     [activeSession, messages, profile, sessions, persistSessions]
   );
 
-  const profileChipDetail = useMemo(() => {
+  const profileSummary = useMemo(() => {
     const parts: string[] = [profile.ageRange];
     if (profile.sex) parts.push(profile.sex);
     if (profile.conditions.length) {
@@ -234,39 +233,7 @@ export default function HomeClient() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-      {/* Hero: welcome + profile chip on one tidy row */}
-      <section className="animate-fade-in flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-card/80 px-4 py-3.5 shadow-(--shadow-card) backdrop-blur-sm sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary to-lavender text-primary-foreground shadow-sm">
-            <Sparkles className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-heading text-sm font-semibold leading-tight sm:text-base">
-              {user ? `Welcome back, ${user.name.split(" ")[0]}` : APP_NAME}
-            </p>
-            <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
-              {user
-                ? "Your profile and chats sync to your account."
-                : "Confidential triage guidance powered by OpenAI."}
-            </p>
-          </div>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setProfileOpen(true)}
-          className="shrink-0 gap-1.5"
-        >
-          <Sliders className="size-3.5" />
-          <span className="hidden sm:inline">Profile</span>
-          <span className="hidden text-[11px] text-muted-foreground lg:inline">
-            · {profileChipDetail}
-          </span>
-        </Button>
-      </section>
-
-      {/* System status: dedicated row so badges + detail can breathe */}
+      {/* System status: full-width row aligned to the right */}
       <section className="flex w-full justify-end">
         <SystemStatusPanel />
       </section>
@@ -306,6 +273,9 @@ export default function HomeClient() {
           onSelect={selectSession}
           onNew={startNewSession}
           onClear={handleClearHistory}
+          user={user ? { name: user.name, email: user.email } : null}
+          profileSummary={profileSummary}
+          onOpenProfile={() => setProfileOpen(true)}
         />
 
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_380px]">
