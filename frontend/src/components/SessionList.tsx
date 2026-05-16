@@ -1,6 +1,17 @@
 "use client";
 
 import { ChatSession } from "@/lib/types";
+import { sectionSubtitle, sectionTitle } from "@/lib/ui";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface Props {
   sessions: ChatSession[];
@@ -18,55 +29,59 @@ export default function SessionList({
   onClear,
 }: Props) {
   return (
-    <aside className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-between border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold">History</h2>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onNew}
-            className="rounded-md bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-700"
-          >
-            New
-          </button>
-          {sessions.length > 0 && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-zinc-800"
-            >
-              Clear
-            </button>
-          )}
+    <Card className="flex max-h-[520px] flex-col shadow-[var(--shadow-card)] lg:max-h-none lg:min-h-[480px]">
+      <CardHeader className="flex-row items-center justify-between gap-2 border-b">
+        <div>
+          <p className={sectionSubtitle}>Chats</p>
+          <CardTitle className={sectionTitle}>History</CardTitle>
         </div>
-      </div>
+        <CardAction className="col-start-auto row-start-auto flex shrink-0 gap-1.5 self-center">
+          <Button type="button" size="sm" onClick={onNew}>
+            New
+          </Button>
+          {sessions.length > 0 && (
+            <Button type="button" size="sm" variant="outline" onClick={onClear}>
+              Clear
+            </Button>
+          )}
+        </CardAction>
+      </CardHeader>
 
-      <ul className="flex-1 overflow-y-auto p-2">
-        {sessions.length === 0 ? (
-          <li className="px-2 py-4 text-center text-xs text-zinc-500">
-            No saved chats yet
-          </li>
-        ) : (
-          sessions.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(s.id)}
-                className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                  activeId === s.id
-                    ? "bg-teal-100 text-teal-900 dark:bg-teal-900/40 dark:text-teal-100"
-                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                }`}
-              >
-                <span className="line-clamp-2 font-medium">{s.title}</span>
-                <span className="mt-1 block text-xs text-zinc-500">
-                  {new Date(s.updatedAt).toLocaleString()}
-                </span>
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
-    </aside>
+      <CardContent className="min-h-0 flex-1 p-0">
+        <ScrollArea className="h-[380px] lg:h-[400px]">
+          <ul className="space-y-1 p-3">
+            {sessions.length === 0 ? (
+              <li className="rounded-xl bg-muted/80 px-4 py-8 text-center">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  No saved chats yet.
+                  <br />
+                  Start a conversation to see history here.
+                </p>
+              </li>
+            ) : (
+              sessions.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(s.id)}
+                    className={cn(
+                      "mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm transition",
+                      activeId === s.id
+                        ? "bg-primary/10 text-foreground ring-2 ring-primary/25"
+                        : "text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <span className="line-clamp-2 font-medium">{s.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {new Date(s.updatedAt).toLocaleString()}
+                    </span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }

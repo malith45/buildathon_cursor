@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Providers from "@/components/Providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,12 +27,25 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+      style={{ colorScheme: "light" }}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-        {children}
-        <footer className="border-t border-zinc-200 py-4 text-center text-xs text-zinc-500 dark:border-zinc-800">
-          Educational use only. Gemini API runs on the backend only.
+      <body className="flex min-h-full flex-col">
+        <div
+          className="pointer-events-none fixed inset-0 -z-10 bg-background"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none fixed -top-32 right-0 -z-10 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none fixed -bottom-24 left-0 -z-10 h-80 w-80 rounded-full bg-mint/15 blur-3xl"
+          aria-hidden
+        />
+        <Providers>{children}</Providers>
+        <footer className="mt-auto border-t bg-card/50 px-4 py-5 text-center text-xs text-muted-foreground backdrop-blur-sm">
+          Educational use only · Gemini runs on the backend only
         </footer>
       </body>
     </html>

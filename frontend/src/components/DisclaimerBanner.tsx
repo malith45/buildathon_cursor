@@ -1,12 +1,18 @@
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 export default function DisclaimerBanner() {
   return (
-    <div
-      role="note"
-      className="rounded-lg border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-700/40 dark:bg-amber-950/40 dark:text-amber-100"
+    <Alert
+      className="border-lavender/50 bg-lavender/15"
+      style={{ borderLeft: "4px solid #b7a6ff" }}
     >
-      <strong>Not medical advice.</strong> This tool does not replace a
-      doctor. If you think it is an emergency, call your local emergency
-      number immediately.
-    </div>
+      <AlertCircle className="text-lavender" />
+      <AlertTitle>Not medical advice</AlertTitle>
+      <AlertDescription>
+        This tool does not replace a doctor. If you think it is an emergency,
+        call your local emergency number immediately.
+      </AlertDescription>
+    </Alert>
   );
 }
