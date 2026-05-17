@@ -23,6 +23,7 @@ async function parseError(res: Response): Promise<string> {
 export async function fetchChatSessions(): Promise<ChatSession[]> {
   const res = await fetch(`${BASE}/api/chats`, {
     headers: authHeaders(),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as { sessions: ChatSession[] };
@@ -36,6 +37,7 @@ export async function syncChatSessions(
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify({ sessions }),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as { sessions: ChatSession[] };

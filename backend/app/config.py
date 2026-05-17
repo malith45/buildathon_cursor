@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,9 +67,19 @@ def get_settings() -> Settings:
     settings = Settings()
     # google-cloud-storage reads GOOGLE_APPLICATION_CREDENTIALS from os.environ,
     # not from pydantic settings. Propagate it once at load time.
-    cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS.strip()
-    if cred_path and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred_path
+    cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS.strip().strip("\"'")
+    if cred_path:
+        # Normalize user-supplied path formats from .env:
+        # - optional wrapping quotes
+        # - ~/ and %VARS%
+        normalized = os.path.expandvars(os.path.expanduser(cred_path))
+        try:
+            normalized = str(Path(normalized).resolve())
+        except Exception:
+            # Keep the expanded path even if resolve fails.
+            pass
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = normalized
+        settings.GOOGLE_APPLICATION_CREDENTIALS = normalized
     return settings
 
 

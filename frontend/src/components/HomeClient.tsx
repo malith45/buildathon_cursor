@@ -40,8 +40,10 @@ export default function HomeClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastGoodSessionsRef = useRef<ChatSession[]>([]);
   const userId = user?.id ?? null;
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export default function HomeClient() {
     let cancelled = false;
 
     async function load() {
+      if (!cancelled) setHistoryLoading(true);
       if (user) {
         const mergedLocal = mergeGuestSessionsIntoAccount(user.id);
         const nextProfile = resolveProfileAfterAuth(
@@ -63,6 +66,8 @@ export default function HomeClient() {
         }
 
         try {
+          // Show something immediately while cloud fetch resolves.
+          if (!cancelled) setSessions(mergedLocal);
           let remote = await fetchChatSessions();
           if (remote.length === 0 && mergedLocal.length > 0) {
             remote = await syncChatSessions(mergedLocal);
@@ -72,28 +77,45 @@ export default function HomeClient() {
             );
           }
           if (!cancelled) {
+            lastGoodSessionsRef.current = remote;
             setSessions(remote);
             saveSessions(remote, user.id);
           }
         } catch (err) {
           if (!cancelled) {
-            setSessions(mergedLocal);
+            const safeFallback =
+              mergedLocal.length > 0 ? mergedLocal : lastGoodSessionsRef.current;
+            setSessions(safeFallback);
+            if (safeFallback.length > 0) {
+              lastGoodSessionsRef.current = safeFallback;
+            }
+            const fallbackCount = mergedLocal.length;
             toast.warning(
               "Could not load chats from server",
-              errorMessage(err, "Showing local history only.")
+              errorMessage(
+                err,
+                safeFallback.length > 0
+                  ? `Showing ${safeFallback.length} local/cached chat${
+                      safeFallback.length === 1 ? "" : "s"
+                    } only.`
+                  : "Cloud chat history unavailable and no local chats found."
+              )
             );
           }
         }
       } else {
         if (!cancelled) {
           setProfile(loadProfile());
-          setSessions(loadSessions());
+          const local = loadSessions();
+          lastGoodSessionsRef.current = local;
+          setSessions(local);
         }
       }
       if (!cancelled) {
         setActiveId(null);
         setMessages([]);
         setDecision(null);
+        setHistoryLoading(false);
       }
     }
 
@@ -133,10 +155,12 @@ export default function HomeClient() {
   const persistSessions = useCallback(
     async (next: ChatSession[]) => {
       setSessions(next);
+      lastGoodSessionsRef.current = next;
       saveSessions(next, userId);
       if (!userId) return;
       try {
         const saved = await syncChatSessions(next);
+        lastGoodSessionsRef.current = saved;
         setSessions(saved);
         saveSessions(saved, userId);
       } catch (err) {
@@ -255,6 +279,7 @@ export default function HomeClient() {
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm">
         <ChatHistorySidebar
           sessions={sessions}
+          loading={historyLoading}
           activeId={activeId}
           onSelect={selectSession}
           onNew={startNewSession}

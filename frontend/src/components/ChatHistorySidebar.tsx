@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import {
+  Loader2,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -30,6 +31,7 @@ function subscribeSidebarExpanded(onStoreChange: () => void): () => void {
 
 interface Props {
   sessions: ChatSession[];
+  loading?: boolean;
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -95,6 +97,7 @@ function formatTime(updatedAt: string): string {
 
 export default function ChatHistorySidebar({
   sessions,
+  loading = false,
   activeId,
   onSelect,
   onNew,
@@ -179,7 +182,9 @@ export default function ChatHistorySidebar({
                 Chats
               </p>
               <p className="truncate text-[11px] text-muted-foreground">
-                {sessions.length === 0
+                {loading
+                  ? "Loading history…"
+                  : sessions.length === 0
                   ? "No conversations yet"
                   : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`}
               </p>
@@ -217,7 +222,19 @@ export default function ChatHistorySidebar({
           )}
         >
         {expanded ? (
-          sessions.length === 0 ? (
+          loading ? (
+            <div className="flex h-full flex-col items-center justify-center px-4 py-8 text-center">
+              <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/70">
+                <Loader2 className="size-5 animate-spin" />
+              </div>
+              <p className="text-xs font-medium text-foreground/70">
+                Loading chat history…
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Fetching your saved conversations.
+              </p>
+            </div>
+          ) : sessions.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-4 py-8 text-center">
               <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/70">
                 <MessagesSquare className="size-5" />
@@ -301,7 +318,13 @@ export default function ChatHistorySidebar({
             className="flex flex-col items-stretch gap-1 px-1"
             aria-label="Chat sessions"
           >
-            {sessions.length === 0 ? (
+            {loading ? (
+              <li className="flex justify-center py-6">
+                <div className="flex size-9 items-center justify-center rounded-xl border border-dashed border-line/60 bg-muted/30 text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin opacity-80" aria-hidden />
+                </div>
+              </li>
+            ) : sessions.length === 0 ? (
               <li className="flex justify-center py-6">
                 <div className="flex size-9 items-center justify-center rounded-xl border border-dashed border-line/60 bg-muted/30 text-muted-foreground">
                   <MessagesSquare className="size-4 opacity-60" aria-hidden />

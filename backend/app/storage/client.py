@@ -6,6 +6,7 @@ so each request reuses the same underlying HTTP session.
 
 import json
 import logging
+import os
 from functools import lru_cache
 from typing import Iterable
 
@@ -140,11 +141,21 @@ def storage_ping() -> None:
 def storage_health_hint() -> str:
     settings = get_settings()
     name = settings.GCS_BUCKET.strip() or "<unset>"
+    cred = settings.GOOGLE_APPLICATION_CREDENTIALS.strip()
+    cred_hint = ""
+    if cred:
+        if os.path.exists(cred):
+            cred_hint = f" Credentials file found at '{cred}'."
+        else:
+            cred_hint = (
+                f" Credentials file was not found at '{cred}'. "
+                "Fix GOOGLE_APPLICATION_CREDENTIALS path in backend/.env."
+            )
     return (
         f"Could not reach GCS bucket '{name}'. Verify GCS_BUCKET in backend/.env, "
         "and confirm the service account in GOOGLE_APPLICATION_CREDENTIALS has "
         "storage.objectAdmin on the bucket (or you've run `gcloud auth "
-        "application-default login`)."
+        f"application-default login`).{cred_hint}"
     )
 
 
