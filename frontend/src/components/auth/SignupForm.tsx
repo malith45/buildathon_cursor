@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSafeNavigate } from "@/lib/navigation";
+import { useRedirectIfAuthenticated } from "@/hooks/useRedirectIfAuthenticated";
+import { useStripSensitiveQueryParams } from "@/hooks/useStripSensitiveQueryParams";
+import { authRedirect } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { errorMessage, toast } from "@/lib/toast";
 import AuthPanel from "@/components/auth/AuthPanel";
@@ -44,8 +46,9 @@ const BAR_BG: Record<StrengthInfo["score"], string> = {
 };
 
 export default function SignupForm() {
-  const navigate = useSafeNavigate();
   const { signup } = useAuth();
+  useRedirectIfAuthenticated("/");
+  useStripSensitiveQueryParams();
   const nameRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -71,11 +74,12 @@ export default function SignupForm() {
     try {
       await signup(email, pw, name);
       toast.success("Account created", "Let's complete your health profile.");
-      navigate("/profile");
+      authRedirect("/profile");
     } catch (err) {
       const msg = errorMessage(err, "Couldn't create your account.");
       setFormError(msg);
       toast.error("Sign up failed", msg);
+    } finally {
       setSubmitting(false);
     }
   }
@@ -96,7 +100,13 @@ export default function SignupForm() {
         </p>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        method="post"
+        action="/signup"
+        noValidate
+        className="space-y-4"
+      >
         <IconInput
           ref={nameRef}
           id="name"

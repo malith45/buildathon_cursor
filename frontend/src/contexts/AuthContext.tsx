@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import * as authApi from "@/lib/auth-api";
@@ -30,22 +31,24 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Bumps on login/signup so in-flight refreshUser cannot clear a new session. */
+  const authEpochRef = useRef(0);
 
   const refreshUser = useCallback(async () => {
+    const epoch = authEpochRef.current;
     const token = getToken();
     if (!token) {
-      setUser(null);
+      if (epoch === authEpochRef.current) setUser(null);
       return;
     }
     try {
       const me = await authApi.fetchMe();
-      setUser(me);
+      if (epoch === authEpochRef.current) setUser(me);
     } catch {
+      if (epoch !== authEpochRef.current) return;
       clearToken();
       setUser(null);
-      if (token) {
-        toast.info("Session expired", "Please sign in again.");
-      }
+      toast.info("Session expired", "Please sign in again.");
     }
   }, []);
 
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const { user: u, token } = await authApi.login(email, password);
     setToken(token);
+    authEpochRef.current += 1;
     setUser(u);
   }, []);
 
@@ -63,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string, name: string) => {
       const { user: u, token } = await authApi.signup(email, password, name);
       setToken(token);
+      authEpochRef.current += 1;
       setUser(u);
     },
     []

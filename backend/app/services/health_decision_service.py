@@ -9,6 +9,8 @@ from app.schemas.health import (
 )
 from app.config import get_settings
 from app.services import openai_service
+from app.services import emergency_escalation
+from app.services import evidence_retrieval
 
 URGENCY_VALUES: set[str] = {
     "self_care",
@@ -48,18 +50,23 @@ def _build_user_content(profile: HealthProfile, messages: list[ChatMessage]) -> 
     )
     conditions = ", ".join(profile.conditions) if profile.conditions else "none listed"
     allergies = ", ".join(profile.allergies) if profile.allergies else "none listed"
-    return f"""Health profile:
+    preg = (
+        "yes"
+        if profile.pregnant is True
+        else ("no" if profile.pregnant is False else "not specified / unknown")
+    )
+    return f"""Health profile (you MUST tailor every part of your JSON to this context):
 - Age range: {profile.ageRange}
 - Sex: {profile.sex or "not specified"}
 - Chronic conditions: {conditions}
 - Allergies: {allergies}
 - Medications: {profile.medications or "none listed"}
-- Pregnant: {"yes" if profile.pregnant else "no"}
+- Pregnant: {preg}
 
 Conversation:
 {history}
 
-Provide a health decision JSON for the user's latest concern based on the full conversation."""
+Provide a health decision JSON for the user's latest concern. Explicitly reflect age, sex, pregnancy status, listed conditions, allergies, and medications where relevant in summary, careSteps, education, and redFlags (e.g. OTC avoidance with allergies, pregnancy precautions, age-appropriate guidance)."""
 
 
 def _parse_decision(raw: str) -> HealthDecisionResponse | None:
@@ -89,7 +96,53 @@ def _parse_decision(raw: str) -> HealthDecisionResponse | None:
         return None
 
 
+def _merge_escalation(
+    decision: HealthDecisionResponse,
+    esc: emergency_escalation.EscalationResult,
+) -> HealthDecisionResponse:
+    if not esc.min_urgency:
+        return decision
+
+    new_u = emergency_escalation.max_urgency(decision.urgency, esc.min_urgency)
+    red = list(decision.redFlags)
+    if esc.min_urgency == "emergency":
+        line = (
+            "If you could be having a medical emergency, call your local "
+            "emergency number or go to the nearest emergency department now."
+        )
+        if not any(line[:30] in r for r in red):
+            red.insert(0, line)
+    elif esc.min_urgency == "urgent_care":
+        line = (
+            "Same-day in-person care may be appropriate. If symptoms worsen, "
+            "seek urgent care or an emergency department."
+        )
+        if not any("Same-day" in r for r in red):
+            red.insert(0, line)
+
+    return decision.model_copy(
+        update={
+            "urgency": new_u,
+            "redFlags": red,
+            "safetyEscalation": True,
+            "safetyNote": esc.note,
+        }
+    )
+
+
+def _finalize_decision(
+    decision: HealthDecisionResponse,
+    esc: emergency_escalation.EscalationResult,
+    user_blob: str,
+) -> HealthDecisionResponse:
+    merged = _merge_escalation(decision, esc)
+    snippets = evidence_retrieval.gather_evidence(user_blob)
+    return merged.model_copy(update={"evidenceSnippets": snippets})
+
+
 def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisionResponse:
+    user_blob = " ".join(m.text for m in messages if m.role == "user")
+    esc = emergency_escalation.detect_escalation(user_blob)
     user_content = _build_user_content(profile, messages)
 
     settings = get_settings()
@@ -101,7 +154,7 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
             raw = openai_service.generate_json(SYSTEM_PROMPT, user_content)
             decision = _parse_decision(raw)
             if decision:
-                return decision
+                return _finalize_decision(decision, esc, user_blob)
             last_error = ValueError("Could not parse model JSON")
         except Exception as exc:
             last_error = exc
@@ -117,4 +170,4 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
             "safety response. Check your usage at "
             "https://platform.openai.com/usage and retry shortly."
         )
-    return fallback
+    return _finalize_decision(fallback, esc, user_blob)

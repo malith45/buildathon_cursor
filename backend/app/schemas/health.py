@@ -21,6 +21,15 @@ class ChatMessage(BaseModel):
     text: str = Field(min_length=1)
 
 
+class EvidenceSnippet(BaseModel):
+    """Retrieved or fixed reference line — not a clinical citation for diagnosis."""
+
+    title: str
+    source: str
+    snippet: str
+    url: str | None = None
+
+
 class DecisionRequest(BaseModel):
     profile: HealthProfile
     messages: list[ChatMessage] = Field(min_length=1)
@@ -34,3 +43,6 @@ class HealthDecisionResponse(BaseModel):
     redFlags: list[str]
     disclaimer: str
     fallback: bool | None = None
+    evidenceSnippets: list[EvidenceSnippet] = Field(default_factory=list)
+    safetyEscalation: bool | None = None
+    safetyNote: str | None = None

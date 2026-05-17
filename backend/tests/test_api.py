@@ -72,3 +72,39 @@ def test_decision_success(mock_generate):
     data = res.json()
     assert data["urgency"] == "self_care"
     assert "summary" in data
+    assert "evidenceSnippets" in data
+    assert isinstance(data["evidenceSnippets"], list)
+
+
+@patch("app.services.health_decision_service.openai_service.generate_json")
+def test_decision_emergency_keyword_escalation(mock_generate):
+    """Model says self_care but user text triggers rule-based emergency escalation."""
+    mock_generate.return_value = """{
+        "urgency": "self_care",
+        "summary": "Sounds mild.",
+        "careSteps": ["Rest"],
+        "education": ["Monitor"],
+        "redFlags": [],
+        "disclaimer": "Educational only."
+    }"""
+
+    res = client.post(
+        "/api/health/decision",
+        json={
+            "profile": {
+                "ageRange": "25-34",
+                "conditions": [],
+                "allergies": [],
+                "medications": "",
+            },
+            "messages": [
+                {"role": "user", "text": "I have chest pain and I can't breathe"}
+            ],
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["urgency"] == "emergency"
+    assert data.get("safetyEscalation") is True
+    assert data.get("safetyNote")
+    assert len(data.get("redFlags", [])) >= 1

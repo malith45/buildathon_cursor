@@ -12,8 +12,10 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
+  ExternalLink,
   HeartPulse,
   Info,
+  Link2,
   ShieldAlert,
   Siren,
   Stethoscope,
@@ -159,6 +161,20 @@ export default function DecisionMessage({
       )}
 
       <div className="space-y-4 px-4 py-4">
+        {decision.safetyEscalation && decision.safetyNote && (
+          <div className="animate-fade-in flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs leading-relaxed dark:border-amber-500/35 dark:bg-amber-500/15">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+            <div>
+              <p className="font-semibold text-amber-900 dark:text-amber-200">
+                Extra safety check
+              </p>
+              <p className="mt-0.5 text-foreground/90">
+                {decision.safetyNote}
+              </p>
+            </div>
+          </div>
+        )}
+
         {decision.fallback && (
           <div className="animate-fade-in flex gap-2 rounded-lg border border-amber-300/50 bg-amber-50/60 p-2.5 text-xs leading-relaxed dark:border-amber-500/30 dark:bg-amber-500/10">
             <Info className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
@@ -249,6 +265,49 @@ export default function DecisionMessage({
                 <li key={i} className="flex gap-2 text-foreground/85">
                   <span className="mt-1.5 size-1 shrink-0 rounded-full bg-lavender" />
                   <span className="flex-1 leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {decision.evidenceSnippets && decision.evidenceSnippets.length > 0 && (
+          <Section
+            icon={Link2}
+            iconWrap="bg-primary/12 text-primary"
+            title="References & trusted reading"
+            delay={280}
+          >
+            <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+              Context from our educational catalog and NIH MedlinePlus search
+              links. This supports transparency — it is{" "}
+              <span className="font-medium text-foreground/80">not</span>{" "}
+              proof of a diagnosis or a clinical evidence grade.
+            </p>
+            <ul className="space-y-3 text-sm">
+              {decision.evidenceSnippets.map((ev, i) => (
+                <li
+                  key={`${ev.title}-${i}`}
+                  className="rounded-lg border border-line/60 bg-muted/25 px-3 py-2.5"
+                >
+                  <p className="font-medium text-foreground">{ev.title}</p>
+                  <p className="mt-0.5 text-[10px] font-medium tracking-wide text-muted-foreground">
+                    {ev.source}
+                  </p>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/90">
+                    {ev.snippet}
+                  </p>
+                  {ev.url ? (
+                    <a
+                      href={ev.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      Open resource
+                      <ExternalLink className="size-3" aria-hidden />
+                    </a>
+                  ) : null}
                 </li>
               ))}
             </ul>

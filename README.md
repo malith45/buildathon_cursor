@@ -11,12 +11,39 @@ Educational health triage assistant: symptom chat, urgency guidance, care steps,
 | Area | What it does |
 |------|----------------|
 | **Triage** | `POST /api/health/decision` — urgency (`self_care` → `emergency`), summary, care steps, education, red flags |
+| **Profile-aware AI** | Every decision sends the saved **health profile** (age, sex, conditions, allergies, medications, pregnancy) so guidance is tailored in the prompt and JSON output |
+| **Safety escalation** | Rule-based **emergency / urgent keyword** scan on user messages; merges with model urgency (never downgrades), adds red flags + `safetyEscalation` / `safetyNote` |
+| **Explainability** | `evidenceSnippets` on each response — catalog search + **MedlinePlus (NIH)** links so advice is paired with trusted reading, not a black box |
 | **Accounts** | Sign up, log in, JWT auth, health profile stored per user (JSON blob in GCS) |
 | **Chat history** | Logged-in users sync sessions to GCS; guests use browser `localStorage` |
 | **Disease catalog** | Search 120+ conditions for profile multi-select (seeded once into GCS) |
 | **System status** | UI panel + `GET /api/health?probe=true` for OpenAI / GCS checks |
+| **Theme** | App-wide **light / dark** mode (header toggle, persisted in `localStorage`) |
 
 **Not provided:** medical diagnosis, prescriptions, or emergency services.
+
+---
+
+## What makes MediAssist AI special
+
+Most consumer **AI health assistants** (e.g. Ada, Buoy, K Health, Babylon-style chatbots, generic ChatGPT health plugins) optimize for a fast conversational answer. MediAssist is built for **trustworthy triage UX** in a hackathon-grade full stack:
+
+| Capability | Typical AI health chatbot | MediAssist AI |
+|------------|---------------------------|---------------|
+| **Personalization** | Often generic unless you repeat context each turn | **Structured health profile** is mandatory context on every `POST /api/health/decision` |
+| **Emergency safety** | Model-only urgency; can under-call emergencies | **Keyword escalation layer** (chest pain, stroke-like symptoms, self-harm, etc.) **raises** urgency even if the model is optimistic |
+| **Transparency** | Advice with no sources | **`evidenceSnippets`** — retrieved catalog lines + NIH MedlinePlus search links in the UI |
+| **Data ownership** | Vendor cloud DB | **Your GCS bucket** — users, chats, disease catalog as JSON you control |
+| **AI provider** | Closed widget or single vendor | **OpenAI on the backend only** (key never in the browser); swappable model via `OPENAI_MODEL` |
+| **Offline / guest use** | Account required | **Guest triage** works without GCS; sign-in syncs profile + chats |
+
+**Our specialties (what we emphasize):**
+
+1. **Profile-first triage** — age, pregnancy, allergies, and conditions shape care steps, education, and red flags.  
+2. **Defense in depth for urgency** — LLM JSON + deterministic safety rules = harder to miss “seek care now” scenarios.  
+3. **Explainability by design** — every triage card can show “References & trusted reading,” not just a summary paragraph.  
+4. **Full-stack transparency** — FastAPI + GCS + Next.js; no hidden Gemini/Supabase lock-in in the current tree.  
+5. **Educational guardrails** — system prompt and UI disclaimers; no diagnosis or prescribing narrative.
 
 ---
 
@@ -47,7 +74,8 @@ flowchart LR
 main.py              # FastAPI app, CORS, exception handlers
 config.py            # Pydantic settings from .env (OpenAI + GCS)
 routers/             # health, auth, chats, diseases
-services/            # openai_service, health_decision, auth
+services/            # openai_service, health_decision_service, auth_service,
+                     # emergency_escalation, evidence_retrieval
 storage/             # GCS client, users_store, chats_store, diseases_store
 schemas/             # Pydantic request/response models
 prompts/             # OpenAI system prompt
@@ -281,11 +309,23 @@ Base URL: `http://localhost:4000` (or `NEXT_PUBLIC_API_URL`).
   "education": ["..."],
   "redFlags": ["..."],
   "disclaimer": "...",
-  "fallback": false
+  "fallback": false,
+  "evidenceSnippets": [
+    {
+      "title": "MedlinePlus search",
+      "source": "NIH MedlinePlus",
+      "snippet": "Trusted consumer health information (search results).",
+      "url": "https://medlineplus.gov/search.html?query=..."
+    }
+  ],
+  "safetyEscalation": false,
+  "safetyNote": null
 }
 ```
 
-`fallback: true` means OpenAI failed — check API key, credit balance, and `OPENAI_MODEL`.
+- `fallback: true` — OpenAI failed; check API key, credit balance, and `OPENAI_MODEL`.  
+- `safetyEscalation: true` — rule-based layer raised urgency or added an extra safety note (see `safetyNote`).  
+- `evidenceSnippets` — always includes at least a MedlinePlus link; catalog matches appear when GCS disease data is available.
 
 ### Auth (requires GCS)
 
@@ -354,6 +394,9 @@ Base URL: `http://localhost:4000` (or `NEXT_PUBLIC_API_URL`).
 | Auth / diseases / chats fail | GCS required — complete [Storage setup](#storage-setup-gcs) |
 | React hydration warning in Cursor browser | Often `data-cursor-ref` from embedded browser; test in Chrome/Edge |
 | `429` / quota errors from OpenAI | Wait a few minutes; check usage; ensure credit balance > $0 |
+| Dark / light toggle seems stuck | Hard refresh; preference is `mediassist-theme` in `localStorage` |
+| LAN dev HMR blocked (`192.168.x.x`) | Add your host to `allowedDevOrigins` in `frontend/next.config.ts` and restart `npm run dev` |
+| Password in browser URL on login | Use `method="post"` on the form (fixed); clear query string from the address bar |
 
 ---
 

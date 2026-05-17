@@ -1,20 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ChatSession } from "@/lib/types";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import {
-  LogIn,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Sliders,
   Trash2,
-  User as UserIcon,
 } from "lucide-react";
 
 const STORAGE_KEY = "mediassist_chat_sidebar_expanded";
@@ -343,89 +340,58 @@ export default function ChatHistorySidebar({
         </div>
       </div>
 
-      {/* Bottom dock — profile / guest only */}
-      <div
-        className={cn(
-          "mt-auto flex shrink-0 flex-col border-t border-line/60 bg-card/95 backdrop-blur-sm",
-          !expanded && "items-center"
-        )}
-      >
+      {/* Bottom dock — signed-in profile only (sign in / sign out are in the header) */}
+      {user ? (
         <div
           className={cn(
-            expanded ? "p-2" : "flex flex-col items-center gap-1 px-1.5 pb-2 pt-1"
+            "mt-auto flex shrink-0 flex-col border-t border-line/60 bg-card/95 backdrop-blur-sm",
+            !expanded && "items-center"
           )}
         >
-        {user ? (
-          expanded ? (
-            <button
-              type="button"
-              onClick={onOpenProfile}
-              className="group/me flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
-              aria-label="Edit health profile"
-              title="Edit health profile"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
-                {initials(user.name)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium leading-tight">
-                  {user.name}
-                </span>
-                {profileSummary && (
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {profileSummary}
-                  </span>
-                )}
-              </span>
-              <Sliders className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/me:text-foreground" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onOpenProfile}
-              aria-label={`Edit health profile (${user.name})`}
-              title={user.name}
-              className="flex size-9 items-center justify-center rounded-xl border border-transparent bg-muted/25 transition-colors hover:border-line/50 hover:bg-muted/60 focus-visible:outline-hidden"
-            >
-              <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
-                {initials(user.name)}
-              </span>
-            </button>
-          )
-        ) : expanded ? (
-          <Link
-            href="/login"
-            className="group/guest flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
-            title="Sign in to save chats"
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <UserIcon className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium leading-tight">
-                Guest
-              </span>
-              <span className="block text-[11px] text-muted-foreground">
-                Sign in to save chats
-              </span>
-            </span>
-            <LogIn className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/guest:text-foreground" />
-          </Link>
-        ) : (
-          <Link
-            href="/login"
+          <div
             className={cn(
-              buttonVariants({ variant: "ghost", size: "icon" }),
-              "size-9 rounded-xl border border-transparent bg-muted/25 text-muted-foreground hover:border-line/50 hover:bg-muted/60 hover:text-foreground"
+              expanded ? "p-2" : "flex flex-col items-center gap-1 px-1.5 pb-2 pt-1"
             )}
-            aria-label="Sign in"
-            title="Sign in"
           >
-            <UserIcon className="size-4" />
-          </Link>
-        )}
+            {expanded ? (
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                className="group/me flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
+                aria-label="Edit health profile"
+                title="Edit health profile"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
+                  {initials(user.name)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium leading-tight">
+                    {user.name}
+                  </span>
+                  {profileSummary && (
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {profileSummary}
+                    </span>
+                  )}
+                </span>
+                <Sliders className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/me:text-foreground" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                aria-label={`Edit health profile (${user.name})`}
+                title={user.name}
+                className="flex size-9 items-center justify-center rounded-xl border border-transparent bg-muted/25 transition-colors hover:border-line/50 hover:bg-muted/60 focus-visible:outline-hidden"
+              >
+                <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
+                  {initials(user.name)}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <Modal
         open={pendingDelete != null}

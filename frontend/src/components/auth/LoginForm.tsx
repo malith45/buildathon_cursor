@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSafeNavigate } from "@/lib/navigation";
+import { useRedirectIfAuthenticated } from "@/hooks/useRedirectIfAuthenticated";
+import { useStripSensitiveQueryParams } from "@/hooks/useStripSensitiveQueryParams";
+import { authRedirect } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { errorMessage, toast } from "@/lib/toast";
 import AuthPanel from "@/components/auth/AuthPanel";
@@ -11,8 +13,9 @@ import { IconInput, PasswordInput } from "@/components/auth/AuthFields";
 import { Loader2, Lock, Mail } from "lucide-react";
 
 export default function LoginForm() {
-  const navigate = useSafeNavigate();
   const { login } = useAuth();
+  useRedirectIfAuthenticated("/");
+  useStripSensitiveQueryParams();
   const emailRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -35,11 +38,12 @@ export default function LoginForm() {
     try {
       await login(email, password);
       toast.success("Welcome back", "Signed in successfully.");
-      navigate("/");
+      authRedirect("/");
     } catch (err) {
       const msg = errorMessage(err, "Invalid email or password.");
       setFormError(msg);
       toast.error("Couldn't sign you in", msg);
+    } finally {
       setSubmitting(false);
     }
   }
@@ -60,7 +64,13 @@ export default function LoginForm() {
         </p>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        method="post"
+        action="/login"
+        noValidate
+        className="space-y-4"
+      >
         <IconInput
           ref={emailRef}
           id="email"

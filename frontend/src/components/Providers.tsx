@@ -1,8 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ThemeProvider from "@/components/ThemeProvider";
 import AppHeader from "@/components/AppHeader";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
+    <ThemeProvider>
       <AuthProvider>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AppHeader />

@@ -20,6 +20,13 @@ export interface ChatMessage {
   text: string;
 }
 
+export interface EvidenceSnippet {
+  title: string;
+  source: string;
+  snippet: string;
+  url?: string | null;
+}
+
 export interface HealthDecisionResponse {
   urgency: UrgencyLevel;
   summary: string;
@@ -28,6 +35,9 @@ export interface HealthDecisionResponse {
   redFlags: string[];
   disclaimer: string;
   fallback?: boolean;
+  evidenceSnippets?: EvidenceSnippet[];
+  safetyEscalation?: boolean | null;
+  safetyNote?: string | null;
 }
 
 export interface ChatSession {

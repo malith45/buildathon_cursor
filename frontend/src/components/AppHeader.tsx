@@ -14,7 +14,7 @@ import { Activity, LogOut } from "lucide-react";
 
 export default function AppHeader() {
   const pathname = usePathname();
-  const { user, loading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useSafeNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
 
@@ -29,7 +29,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-card/80 backdrop-blur-md">
+      <header className="sticky top-0 z-40 shrink-0 border-b border-line/60 bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
@@ -44,7 +44,7 @@ export default function AppHeader() {
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
-            {loading ? null : user ? (
+            {user ? (
               <Button
                 variant="ghost"
                 size="sm"
