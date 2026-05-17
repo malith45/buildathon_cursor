@@ -1,0 +1,32 @@
+# MediAssist API — deploy at https://dashboard.render.com (Blueprint / New Blueprint)
+# After deploy, set CORS_ORIGINS to your Netlify URL in the Render dashboard.
+services:
+  - type: web
+    name: mediassist-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: STORAGE_ENABLED
+        value: "true"
+      - key: GCS_BUCKET
+        sync: false
+      - key: GCS_PROJECT
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false

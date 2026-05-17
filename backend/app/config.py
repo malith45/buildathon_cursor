@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
     PORT: int = 4000
     CORS_ORIGIN: str = "http://localhost:3000"
+    # Comma-separated allowed browser origins (production Netlify URL, previews, etc.).
+    # When set, used together with CORS_ORIGIN and local dev defaults.
+    CORS_ORIGINS: str = ""
     APP_ENV: str = "development"
     # Hard safety switch: destructive storage reset for tests only.
     ALLOW_TEST_DATA_RESET: bool = False
@@ -50,6 +53,20 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.strip().lower() in ("production", "prod")
+
+    def cors_origins_list(self) -> list[str]:
+        origins: set[str] = {
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        }
+        if self.CORS_ORIGIN.strip():
+            origins.add(self.CORS_ORIGIN.strip())
+        if self.CORS_ORIGINS.strip():
+            for part in self.CORS_ORIGINS.replace(";", ",").split(","):
+                o = part.strip()
+                if o:
+                    origins.add(o)
+        return sorted(origins)
 
     def validate_production_secrets(self) -> None:
         """Refuse to boot in production with known-insecure defaults."""

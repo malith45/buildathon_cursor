@@ -1,0 +1,14 @@
+# MediAssist frontend (Next.js) — https://docs.netlify.com/frameworks/next-js/
+[build]
+  base = "frontend"
+  command = "npm ci && npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Set in Netlify UI → Site configuration → Environment variables:
+#   NEXT_PUBLIC_API_URL = https://your-api.onrender.com
