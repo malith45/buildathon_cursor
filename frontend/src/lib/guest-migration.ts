@@ -4,7 +4,7 @@ import {
   saveSessions,
   upsertSession,
 } from "@/lib/chat-storage";
-import { loadProfile, saveProfile } from "@/lib/profile-storage";
+import { clearProfile, loadProfile, saveProfile } from "@/lib/profile-storage";
 import { ChatSession, DEFAULT_PROFILE, HealthProfile } from "@/lib/types";
 
 /** True when the guest edited profile beyond factory defaults. */
@@ -44,5 +44,7 @@ export function resolveProfileAfterAuth(
     return serverProfile;
   }
   saveProfile(guest, userId);
+  // Prevent repeated profile-migration loops on subsequent renders/logins.
+  clearProfile(null);
   return guest;
 }

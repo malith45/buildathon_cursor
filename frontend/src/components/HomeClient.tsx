@@ -44,6 +44,7 @@ export default function HomeClient() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGoodSessionsRef = useRef<ChatSession[]>([]);
+  const migratedProfileForUserRef = useRef<string | null>(null);
   const userId = user?.id ?? null;
 
   useEffect(() => {
@@ -59,7 +60,11 @@ export default function HomeClient() {
           user.id
         );
         if (!cancelled) setProfile(nextProfile);
-        if (guestProfileDiffersFromDefault(nextProfile)) {
+        const shouldSyncGuestProfile =
+          guestProfileDiffersFromDefault(nextProfile) &&
+          migratedProfileForUserRef.current !== user.id;
+        if (shouldSyncGuestProfile) {
+          migratedProfileForUserRef.current = user.id;
           void updateHealthProfile(nextProfile).catch(() => {
             /* local copy already saved in resolveProfileAfterAuth */
           });
@@ -104,6 +109,7 @@ export default function HomeClient() {
           }
         }
       } else {
+        migratedProfileForUserRef.current = null;
         if (!cancelled) {
           setProfile(loadProfile());
           const local = loadSessions();
