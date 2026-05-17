@@ -40,6 +40,11 @@ export default function DiseaseMultiSelect({
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
+    setSuggestions([]);
+  }, []);
+
   const selectedKey = value.map(normalize).join("\0");
 
   const addCondition = useCallback(
@@ -49,9 +54,9 @@ export default function DiseaseMultiSelect({
       if (value.some((c) => normalize(c) === normalize(trimmed))) return;
       onChange([...value, trimmed]);
       setQuery("");
-      setOpen(false);
+      closeDropdown();
     },
-    [onChange, value]
+    [closeDropdown, onChange, value]
   );
 
   const removeCondition = useCallback(
@@ -66,18 +71,15 @@ export default function DiseaseMultiSelect({
 
     const handleClickOutside = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        closeDropdown();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  }, [closeDropdown, open]);
 
   useEffect(() => {
-    if (!open) {
-      setSuggestions([]);
-      return;
-    }
+    if (!open) return;
 
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -151,7 +153,7 @@ export default function DiseaseMultiSelect({
               }
             }
             if (e.key === "Escape") {
-              setOpen(false);
+              closeDropdown();
             }
             if (e.key === "Backspace" && !query && value.length > 0) {
               removeCondition(value[value.length - 1]);
@@ -163,7 +165,7 @@ export default function DiseaseMultiSelect({
           <div
             id={listId}
             role="listbox"
-            className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-line/80 bg-card shadow-[var(--shadow-card)]"
+            className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-line/80 bg-card shadow-(--shadow-card)"
           >
             {loading && (
               <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground">
@@ -189,6 +191,7 @@ export default function DiseaseMultiSelect({
                       <button
                         type="button"
                         role="option"
+                        aria-selected={false}
                         className={cn(
                           "flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm",
                           "hover:bg-primary/10 focus:bg-primary/10 focus:outline-none"

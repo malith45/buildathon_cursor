@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -32,6 +33,7 @@ async def lifespan(_app: FastAPI):
     _ensure_utf8_console()
     get_settings.cache_clear()
     settings = get_settings()
+    settings.validate_production_secrets()
     storage_ok, _ai_ok = log_startup_connections()
 
     if settings.storage_configured and storage_ok:
@@ -91,22 +93,34 @@ async def http_exception_handler(
 ) -> JSONResponse:
     detail = exc.detail
     if isinstance(detail, str):
-        message = detail
-    elif isinstance(detail, dict) and "error" in detail:
-        message = str(detail["error"])
-    else:
-        message = "Request failed"
-    return JSONResponse(status_code=exc.status_code, content={"error": message})
+        return JSONResponse(status_code=exc.status_code, content={"error": detail})
+    if isinstance(detail, dict):
+        body: dict = {}
+        if "error" in detail:
+            body["error"] = str(detail["error"])
+        elif "message" in detail:
+            body["error"] = str(detail["message"])
+        else:
+            body["error"] = "Request failed"
+        if "details" in detail:
+            body["details"] = detail["details"]
+        return JSONResponse(status_code=exc.status_code, content=body)
+    return JSONResponse(
+        status_code=exc.status_code, content={"error": "Request failed"}
+    )
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     _request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    return JSONResponse(
-        status_code=400,
-        content={"error": "Invalid request body", "details": exc.errors()},
-    )
+    payload = {
+        "error": "Invalid request body",
+        "details": exc.errors(),
+    }
+    # Pydantic may embed ValueError objects in ctx — ensure JSON-safe.
+    safe_payload = json.loads(json.dumps(payload, default=str))
+    return JSONResponse(status_code=400, content=safe_payload)
 
 
 @app.exception_handler(Exception)

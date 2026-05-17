@@ -38,7 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const epoch = authEpochRef.current;
     const token = getToken();
     if (!token) {
-      if (epoch === authEpochRef.current) setUser(null);
+      if (epoch === authEpochRef.current) {
+        queueMicrotask(() => {
+          if (epoch === authEpochRef.current) setUser(null);
+        });
+      }
       return;
     }
     try {
@@ -53,8 +57,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refreshUser().finally(() => setLoading(false));
-  }, [refreshUser]);
+    let cancelled = false;
+
+    async function bootstrap() {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      const epoch = authEpochRef.current;
+      const token = getToken();
+      if (!token) {
+        if (epoch === authEpochRef.current) setUser(null);
+      } else {
+        try {
+          const me = await authApi.fetchMe();
+          if (epoch === authEpochRef.current) setUser(me);
+        } catch {
+          if (epoch !== authEpochRef.current || cancelled) return;
+          clearToken();
+          setUser(null);
+          toast.info("Session expired", "Please sign in again.");
+        }
+      }
+      if (!cancelled) setLoading(false);
+    }
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const { user: u, token } = await authApi.login(email, password);

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeNavigate } from "@/lib/navigation";
-import { DEFAULT_PROFILE, type HealthProfile } from "@/lib/types";
+import { type HealthProfile, type User } from "@/lib/types";
 import { errorMessage, toast } from "@/lib/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -22,24 +22,24 @@ import { Modal } from "@/components/ui/modal";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-function ProfileContent() {
-  const { user, updateName, updateHealthProfile } = useAuth();
+function ProfileForm({
+  user,
+  updateName,
+  updateHealthProfile,
+}: {
+  user: User;
+  updateName: (name: string) => Promise<void>;
+  updateHealthProfile: (profile: HealthProfile) => Promise<void>;
+}) {
   const navigate = useSafeNavigate();
-  const [name, setName] = useState("");
-  const [healthProfile, setHealthProfile] =
-    useState<HealthProfile>(DEFAULT_PROFILE);
+  const [name, setName] = useState(user.name);
+  const [healthProfile, setHealthProfile] = useState<HealthProfile>(
+    user.healthProfile
+  );
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setName(user.name);
-      setHealthProfile(user.healthProfile);
-    }
-  }, [user]);
-
   async function handleSave() {
-    if (!user) return;
     setSaving(true);
     try {
       const updates: Promise<unknown>[] = [];
@@ -65,8 +65,6 @@ function ProfileContent() {
     setShowSuccess(false);
     navigate("/");
   }
-
-  if (!user) return null;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8 sm:px-6">
@@ -152,8 +150,8 @@ function ProfileContent() {
           </div>
           <h2 className="font-heading text-lg font-semibold">All set!</h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Your health profile is saved. We'll use it to tailor guidance the
-            next time you describe symptoms.
+            Your health profile is saved. We&apos;ll use it to tailor guidance
+            the next time you describe symptoms.
           </p>
         </div>
         <div className="flex items-center justify-center gap-2 border-t border-line/60 bg-muted/30 px-6 py-3 sm:px-7">
@@ -171,6 +169,19 @@ function ProfileContent() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function ProfileContent() {
+  const { user, updateName, updateHealthProfile } = useAuth();
+  if (!user) return null;
+  return (
+    <ProfileForm
+      key={user.id}
+      user={user}
+      updateName={updateName}
+      updateHealthProfile={updateHealthProfile}
+    />
   );
 }
 

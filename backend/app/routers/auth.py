@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
 from app.dependencies import get_current_user_id
+from app.storage_gate import STORAGE_NOT_CONFIGURED_MSG, require_storage
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
@@ -25,6 +26,10 @@ STORAGE_UNAVAILABLE = (
 
 
 def _raise_auth_error(exc: Exception) -> None:
+    if isinstance(exc, RuntimeError) and "GCS_BUCKET" in str(exc):
+        raise HTTPException(
+            status_code=503, detail=STORAGE_NOT_CONFIGURED_MSG
+        ) from exc
     if isinstance(exc, auth_service.AuthError):
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     if isinstance(exc, ValidationError):
@@ -40,7 +45,12 @@ def _raise_auth_error(exc: Exception) -> None:
     ) from exc
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=201)
+@router.post(
+    "/signup",
+    response_model=AuthResponse,
+    status_code=201,
+    dependencies=[Depends(require_storage)],
+)
 def post_signup(body: SignupRequest) -> AuthResponse:
     try:
         user, token = auth_service.signup(body.email, body.password, body.name)
@@ -58,7 +68,7 @@ def post_login(body: LoginRequest) -> AuthResponse:
         _raise_auth_error(exc)
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, dependencies=[Depends(require_storage)])
 def get_me(user_id: str = Depends(get_current_user_id)) -> UserResponse:
     try:
         user = auth_service.get_user_by_id(user_id)
@@ -71,7 +81,7 @@ def get_me(user_id: str = Depends(get_current_user_id)) -> UserResponse:
         _raise_auth_error(exc)
 
 
-@router.patch("/profile", response_model=UserResponse)
+@router.patch("/profile", response_model=UserResponse, dependencies=[Depends(require_storage)])
 def patch_profile(
     body: ProfileUpdateRequest,
     user_id: str = Depends(get_current_user_id),

@@ -1,4 +1,5 @@
 import { ChatMessage, ChatSession, HealthDecisionResponse } from "./types";
+import { createUuid } from "./uuid";
 
 const STORAGE_KEY = "healthcare_sessions";
 
@@ -30,7 +31,7 @@ export function createSession(firstMessage: string): ChatSession {
       ? `${firstMessage.slice(0, 40)}…`
       : firstMessage;
   return {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     title: title || "New chat",
     messages: [],
     updatedAt: new Date().toISOString(),

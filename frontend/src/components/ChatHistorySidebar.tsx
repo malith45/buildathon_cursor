@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { ChatSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -15,6 +15,18 @@ import {
 } from "lucide-react";
 
 const STORAGE_KEY = "mediassist_chat_sidebar_expanded";
+const SIDEBAR_EXPANDED_EVENT = "mediassist-sidebar-expanded-change";
+
+function readSidebarExpanded(): boolean {
+  if (typeof window === "undefined") return true;
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored !== null ? stored === "true" : true;
+}
+
+function subscribeSidebarExpanded(onStoreChange: () => void): () => void {
+  window.addEventListener(SIDEBAR_EXPANDED_EVENT, onStoreChange);
+  return () => window.removeEventListener(SIDEBAR_EXPANDED_EVENT, onStoreChange);
+}
 
 interface Props {
   sessions: ChatSession[];
@@ -91,25 +103,20 @@ export default function ChatHistorySidebar({
   profileSummary = "",
   onOpenProfile,
 }: Props) {
-  const [expanded, setExpanded] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
+  const expanded = useSyncExternalStore(
+    subscribeSidebarExpanded,
+    readSidebarExpanded,
+    () => true
+  );
   const [pendingDelete, setPendingDelete] = useState<{
     id: string;
     title: string;
   } | null>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) setExpanded(stored === "true");
-    setHydrated(true);
-  }, []);
-
   const toggle = useCallback(() => {
-    setExpanded((prev) => {
-      const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
-      return next;
-    });
+    const next = !readSidebarExpanded();
+    localStorage.setItem(STORAGE_KEY, String(next));
+    window.dispatchEvent(new Event(SIDEBAR_EXPANDED_EVENT));
   }, []);
 
   const grouped = useMemo(() => {
@@ -132,9 +139,10 @@ export default function ChatHistorySidebar({
     <aside
       className={cn(
         "flex h-full min-h-0 shrink-0 flex-col border-r border-line/70 bg-sidebar/90 transition-[width] duration-200 ease-in-out",
-        hydrated ? widthClass : "w-[268px]"
+        widthClass
       )}
       aria-label="Chat history sidebar"
+      suppressHydrationWarning
     >
       {/* Top chrome — fixed, does not scroll */}
       <div
@@ -340,8 +348,8 @@ export default function ChatHistorySidebar({
         </div>
       </div>
 
-      {/* Bottom dock — signed-in profile only (sign in / sign out are in the header) */}
-      {user ? (
+      {/* Bottom dock — health profile (guests + signed-in) */}
+      {onOpenProfile ? (
         <div
           className={cn(
             "mt-auto flex shrink-0 flex-col border-t border-line/60 bg-card/95 backdrop-blur-sm",
@@ -361,18 +369,24 @@ export default function ChatHistorySidebar({
                 aria-label="Edit health profile"
                 title="Edit health profile"
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
-                  {initials(user.name)}
-                </span>
+                {user ? (
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
+                    {initials(user.name)}
+                  </span>
+                ) : (
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <Sliders className="size-4" />
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium leading-tight">
-                    {user.name}
+                    {user ? user.name : "Health profile"}
                   </span>
-                  {profileSummary && (
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      {profileSummary}
-                    </span>
-                  )}
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {user
+                      ? profileSummary || "Personalizes guidance"
+                      : "Set age, conditions, allergies…"}
+                  </span>
                 </span>
                 <Sliders className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/me:text-foreground" />
               </button>
@@ -380,13 +394,17 @@ export default function ChatHistorySidebar({
               <button
                 type="button"
                 onClick={onOpenProfile}
-                aria-label={`Edit health profile (${user.name})`}
-                title={user.name}
+                aria-label="Edit health profile"
+                title="Health profile"
                 className="flex size-9 items-center justify-center rounded-xl border border-transparent bg-muted/25 transition-colors hover:border-line/50 hover:bg-muted/60 focus-visible:outline-hidden"
               >
-                <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
-                  {initials(user.name)}
-                </span>
+                {user ? (
+                  <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
+                    {initials(user.name)}
+                  </span>
+                ) : (
+                  <Sliders className="size-4 text-muted-foreground" />
+                )}
               </button>
             )}
           </div>

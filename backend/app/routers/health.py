@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import assert_openai_key, get_settings
@@ -6,6 +8,8 @@ from app.services import health_decision_service, openai_service
 from app.storage import client as storage_client
 from app.storage import diseases_store
 from app.storage.errors import is_storage_unavailable
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -27,6 +31,11 @@ def _storage_status() -> tuple[bool, bool, str | None]:
 def post_init_storage() -> dict:
     """Verify bucket access and seed the disease catalog (local dev helper)."""
     settings = get_settings()
+    if settings.is_production and not settings.ALLOW_TEST_DATA_RESET:
+        raise HTTPException(
+            status_code=403,
+            detail="init-storage is disabled in production.",
+        )
     if not settings.storage_configured:
         raise HTTPException(
             status_code=503,
@@ -61,7 +70,11 @@ def health_check(
         "storageConfigured": storage_configured,
         "storageConnected": storage_connected,
         "storageMessage": storage_message,
-        "storageBucket": settings.GCS_BUCKET if storage_configured else None,
+        "storageBucket": (
+            settings.GCS_BUCKET
+            if storage_configured and not settings.is_production
+            else None
+        ),
         "diseasesReady": diseases_ready,
     }
     if probe:
@@ -87,6 +100,7 @@ def post_decision(body: DecisionRequest) -> HealthDecisionResponse:
     try:
         return health_decision_service.decide(body.profile, body.messages)
     except Exception:
+        logger.exception("Unexpected error in POST /api/health/decision")
         raise HTTPException(
             status_code=500,
             detail="An unexpected error occurred.",

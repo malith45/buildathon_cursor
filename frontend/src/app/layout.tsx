@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import Providers from "@/components/Providers";
-import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap-script";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
 import "./globals.css";
 
@@ -35,22 +35,28 @@ export default function RootLayout({
         className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground"
         suppressHydrationWarning
       >
-        {/* First body child: theme + extension cleanup. Not in <head> — avoids hydration mismatch when AV extensions rewrite head scripts. */}
-        <script
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: BOOTSTRAP_SCRIPT }}
+        <Script
+          src="/mediassist-hydration-guard.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="/mediassist-theme-init.js"
+          strategy="beforeInteractive"
         />
         <div
           className="pointer-events-none fixed inset-0 -z-10 bg-background"
           aria-hidden
+          suppressHydrationWarning
         />
         <div
           className="pointer-events-none fixed -top-32 right-0 -z-10 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
           aria-hidden
+          suppressHydrationWarning
         />
         <div
           className="pointer-events-none fixed -bottom-24 left-0 -z-10 h-80 w-80 rounded-full bg-mint/15 blur-3xl"
           aria-hidden
+          suppressHydrationWarning
         />
         <Providers>{children}</Providers>
       </body>

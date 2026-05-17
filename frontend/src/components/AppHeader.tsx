@@ -10,13 +10,16 @@ import { Modal } from "@/components/ui/modal";
 import { toast } from "@/lib/toast";
 import { APP_NAME } from "@/lib/brand";
 import ThemeToggle from "@/components/ThemeToggle";
-import { Activity, LogOut } from "lucide-react";
+import { Activity, LogOut, User } from "lucide-react";
+
+const AUTH_ROUTES = new Set(["/login", "/signup"]);
 
 export default function AppHeader() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const navigate = useSafeNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const onAuthPage = AUTH_ROUTES.has(pathname);
 
   function performLogout() {
     setConfirmLogout(false);
@@ -30,7 +33,7 @@ export default function AppHeader() {
   return (
     <>
       <header className="sticky top-0 z-40 shrink-0 border-b border-line/60 bg-card/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-12 max-w-[1500px] items-center gap-2 px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
             className="group/logo flex items-center gap-2.5 font-heading text-sm font-semibold text-foreground"
@@ -45,17 +48,27 @@ export default function AppHeader() {
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
             {user ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmLogout(true)}
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut className="size-3.5" />
-                <span className="hidden sm:inline">Log out</span>
-              </Button>
-            ) : (
+              <>
+                <Link
+                  href="/profile"
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                  title="Account & profile"
+                >
+                  <User className="size-3.5" />
+                  <span className="hidden sm:inline">Account</span>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmLogout(true)}
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="size-3.5" />
+                  <span className="hidden sm:inline">Log out</span>
+                </Button>
+              </>
+            ) : onAuthPage ? null : (
               <>
                 <Link
                   href="/login"

@@ -96,7 +96,7 @@ security/            # password hashing
 
 ```
 app/                 # /, /login, /signup, /profile
-components/          # Chat, TriageCard, HealthProfileForm, SystemStatusPanel, auth, ui
+components/          # Chat, DecisionMessage, HealthProfileForm, ThemeToggle, auth, ui
 contexts/            # AuthContext
 lib/                 # apiClient, auth-api, chats-api, diseases-api, storage
 ```
@@ -392,11 +392,39 @@ Base URL: `http://localhost:4000` (or `NEXT_PUBLIC_API_URL`).
 | `Could not reach GCS bucket` | Check network, bucket name typo, or run `gcloud auth application-default login` |
 | Port 4000 in use | Stop other process or change `PORT` |
 | Auth / diseases / chats fail | GCS required — complete [Storage setup](#storage-setup-gcs) |
+| React hydration warning (`bis_use`, Bitdefender, etc.) | Theme loads via `public/mediassist-theme-init.js` + `next/script` (not inline React `<script>`); hard refresh after pull |
 | React hydration warning in Cursor browser | Often `data-cursor-ref` from embedded browser; test in Chrome/Edge |
 | `429` / quota errors from OpenAI | Wait a few minutes; check usage; ensure credit balance > $0 |
 | Dark / light toggle seems stuck | Hard refresh; preference is `mediassist-theme` in `localStorage` |
 | LAN dev HMR blocked (`192.168.x.x`) | Add your host to `allowedDevOrigins` in `frontend/next.config.ts` and restart `npm run dev` |
 | Password in browser URL on login | Use `method="post"` on the form (fixed); clear query string from the address bar |
+
+---
+
+## Quality audit (recent fixes)
+
+A full-stack review addressed the following (see git history for details):
+
+| Area | Issue | Fix |
+|------|--------|-----|
+| **Auth / storage** | Login/signup returned opaque 500 when `STORAGE_ENABLED=false` | Auth & chat routes return **503** with a clear message; `require_storage` dependency |
+| **Security** | `POST /api/health/init-storage` open to anyone | **Blocked in production** (`APP_ENV=production`); use only in dev |
+| **Security** | Default `AUTH_SECRET` in production | Server **refuses to start** if `APP_ENV=production` and secret is still the dev default |
+| **Chats** | Invalid session IDs silently dropped on sync | **400** validation — session `id` must be a UUID |
+| **Frontend** | Guest profile not editable from chat UI | Sidebar **Health profile** opens drawer for guests and signed-in users |
+| **Frontend** | Guest chats/profile lost after login | **Merge** guest `localStorage` into account on sign-in |
+| **Frontend** | Profile drawer PATCH on every keystroke | **Debounced** sync (~800ms) to the API |
+| **Frontend** | Signup redirect raced to home instead of profile | Signup uses **`authRedirect("/profile")`** only |
+| **Frontend** | Header status badges noisy in dev | **Removed** API/GCS/OpenAI badges and Test OpenAI button |
+| **Frontend** | Theme `<script>` hydration vs AV extensions | Theme init moved to **static JS** (`mediassist-theme-init.js`) |
+| **Frontend** | Duplicate Log in/Sign up on auth pages | Hidden in header on `/login` and `/signup` |
+| **UX** | Login form used GET (credentials in URL) | **`method="post"`** + query param stripper |
+
+**Still intentional / known limits:**
+
+- `POST /api/health/decision` is **public** (no auth) — add rate limits or API keys before high-traffic production.
+- Chat sync is **last-write-wins** (no optimistic concurrency on chat blobs yet).
+- Only the **latest** assistant turn shows the rich triage card in the UI (older per-turn decisions are not stored).
 
 ---
 

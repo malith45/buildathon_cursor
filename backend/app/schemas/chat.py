@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+import uuid
+
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.health import ChatMessage, HealthDecisionResponse
 
@@ -9,6 +11,12 @@ class ChatSessionPayload(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     lastDecision: HealthDecisionResponse | None = None
     updatedAt: str = Field(min_length=1)
+
+    @field_validator("id")
+    @classmethod
+    def id_must_be_uuid(cls, value: str) -> str:
+        uuid.UUID(value)
+        return value
 
 
 class ChatSessionListResponse(BaseModel):

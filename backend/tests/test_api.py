@@ -108,3 +108,40 @@ def test_decision_emergency_keyword_escalation(mock_generate):
     assert data.get("safetyEscalation") is True
     assert data.get("safetyNote")
     assert len(data.get("redFlags", [])) >= 1
+
+
+def test_login_returns_503_when_storage_disabled():
+    res = client.post(
+        "/api/auth/login",
+        json={"email": "a@b.com", "password": "password123"},
+    )
+    assert res.status_code == 503
+    assert "storage" in res.json().get("error", "").lower()
+
+
+def test_chat_sync_rejects_invalid_session_id():
+    from app.dependencies import get_current_user_id
+    from app.storage_gate import require_storage
+
+    app.dependency_overrides[require_storage] = lambda: None
+    app.dependency_overrides[get_current_user_id] = (
+        lambda: "00000000-0000-0000-0000-000000000001"
+    )
+    try:
+        res = client.put(
+            "/api/chats",
+            json={
+                "sessions": [
+                    {
+                        "id": "not-a-uuid",
+                        "title": "Bad",
+                        "messages": [],
+                        "updatedAt": "2026-01-01T00:00:00Z",
+                    }
+                ]
+            },
+            headers={"Authorization": "Bearer unused"},
+        )
+        assert res.status_code == 400
+    finally:
+        app.dependency_overrides.clear()

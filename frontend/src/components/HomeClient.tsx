@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Chat from "@/components/Chat";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ProfileDrawer from "@/components/ProfileDrawer";
@@ -13,6 +13,11 @@ import {
   updateSessionMessages,
   upsertSession,
 } from "@/lib/chat-storage";
+import {
+  guestProfileDiffersFromDefault,
+  mergeGuestSessionsIntoAccount,
+  resolveProfileAfterAuth,
+} from "@/lib/guest-migration";
 import { loadProfile, saveProfile } from "@/lib/profile-storage";
 import {
   ChatMessage,
@@ -24,6 +29,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage, toast } from "@/lib/toast";
 
+const PROFILE_SYNC_MS = 800;
+
 export default function HomeClient() {
   const { user, loading: authLoading, updateHealthProfile } = useAuth();
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
@@ -33,6 +40,7 @@ export default function HomeClient() {
   const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userId = user?.id ?? null;
 
   useEffect(() => {
@@ -41,12 +49,22 @@ export default function HomeClient() {
 
     async function load() {
       if (user) {
-        setProfile(user.healthProfile);
-        const local = loadSessions(user.id);
+        const mergedLocal = mergeGuestSessionsIntoAccount(user.id);
+        const nextProfile = resolveProfileAfterAuth(
+          user.healthProfile,
+          user.id
+        );
+        if (!cancelled) setProfile(nextProfile);
+        if (guestProfileDiffersFromDefault(nextProfile)) {
+          void updateHealthProfile(nextProfile).catch(() => {
+            /* local copy already saved in resolveProfileAfterAuth */
+          });
+        }
+
         try {
           let remote = await fetchChatSessions();
-          if (remote.length === 0 && local.length > 0) {
-            remote = await syncChatSessions(local);
+          if (remote.length === 0 && mergedLocal.length > 0) {
+            remote = await syncChatSessions(mergedLocal);
             toast.success(
               "Chats synced",
               "Your local history was saved to your account."
@@ -58,7 +76,7 @@ export default function HomeClient() {
           }
         } catch (err) {
           if (!cancelled) {
-            setSessions(local);
+            setSessions(mergedLocal);
             toast.warning(
               "Could not load chats from server",
               errorMessage(err, "Showing local history only.")
@@ -66,8 +84,10 @@ export default function HomeClient() {
           }
         }
       } else {
-        setProfile(loadProfile());
-        if (!cancelled) setSessions(loadSessions());
+        if (!cancelled) {
+          setProfile(loadProfile());
+          setSessions(loadSessions());
+        }
       }
       if (!cancelled) {
         setActiveId(null);
@@ -80,7 +100,13 @@ export default function HomeClient() {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, updateHealthProfile]);
+
+  useEffect(() => {
+    return () => {
+      if (profileSyncTimer.current) clearTimeout(profileSyncTimer.current);
+    };
+  }, []);
 
   const activeSession = sessions.find((s) => s.id === activeId) ?? null;
 
@@ -88,14 +114,17 @@ export default function HomeClient() {
     (next: HealthProfile) => {
       setProfile(next);
       saveProfile(next, userId);
-      if (user) {
+      if (!user) return;
+
+      if (profileSyncTimer.current) clearTimeout(profileSyncTimer.current);
+      profileSyncTimer.current = setTimeout(() => {
         void updateHealthProfile(next).catch((err) => {
           toast.warning(
             "Profile not synced",
-            errorMessage(err, "Save from your profile page when online.")
+            errorMessage(err, "Changes saved on this device only.")
           );
         });
-      }
+      }, PROFILE_SYNC_MS);
     },
     [user, userId, updateHealthProfile]
   );
@@ -114,7 +143,7 @@ export default function HomeClient() {
           "Chat not saved online",
           errorMessage(
             err,
-            "Saved on this device only. Check database connection."
+            "Saved on this device only. Check storage in the header status panel."
           )
         );
       }
@@ -187,7 +216,7 @@ export default function HomeClient() {
         if (result.fallback) {
           toast.warning(
             "Limited AI response",
-            "Using safe fallback guidance. Check OpenAI status in the header."
+            "Using safe fallback guidance. Check OPENAI_API_KEY in backend/.env and restart the API."
           );
         }
       } catch (err) {
@@ -218,7 +247,6 @@ export default function HomeClient() {
 
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
-      {/* Workspace fills the viewport column; only inner panes scroll (ChatGPT-style). */}
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm">
         <ChatHistorySidebar
           sessions={sessions}

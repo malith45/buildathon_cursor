@@ -82,7 +82,7 @@ export default function ProfileDrawer({
         </div>
 
         <div className="border-t border-line/60 bg-card px-5 py-3 text-[11px] text-muted-foreground">
-          Changes save automatically. Close when you’re done.
+          Changes save automatically. Close when you&apos;re done.
         </div>
       </aside>
     </>

@@ -46,6 +46,20 @@ class Settings(BaseSettings):
     def storage_configured(self) -> bool:
         return self.STORAGE_ENABLED and bool(self.GCS_BUCKET.strip())
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() in ("production", "prod")
+
+    def validate_production_secrets(self) -> None:
+        """Refuse to boot in production with known-insecure defaults."""
+        if not self.is_production:
+            return
+        weak = "dev-only-change-in-production-buildathon"
+        if self.AUTH_SECRET.strip() in ("", weak):
+            raise RuntimeError(
+                "AUTH_SECRET must be set to a long random value when APP_ENV=production."
+            )
+
 
 @lru_cache
 def get_settings() -> Settings:
