@@ -85,7 +85,7 @@ export default function SignupForm() {
   return (
     <AuthPanel
       title="Create your account"
-      subtitle="A 30-second signup to sync your profile and chat history."
+      subtitle=""
       footer={
         <p className="text-center text-xs text-muted-foreground">
           Already a member?{" "}
