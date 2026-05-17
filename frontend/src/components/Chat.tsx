@@ -105,7 +105,7 @@ export default function Chat({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading]);
+  }, [messages, loading, decision]);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;

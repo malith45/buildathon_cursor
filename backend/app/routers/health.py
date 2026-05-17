@@ -98,7 +98,9 @@ def post_decision(body: DecisionRequest) -> HealthDecisionResponse:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
     try:
-        return health_decision_service.decide(body.profile, body.messages)
+        result = health_decision_service.decide(body.profile, body.messages)
+        # Always serialize full model so evidenceSnippets / safety fields are present.
+        return HealthDecisionResponse.model_validate(result.model_dump())
     except Exception:
         logger.exception("Unexpected error in POST /api/health/decision")
         raise HTTPException(

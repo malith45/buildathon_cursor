@@ -117,7 +117,7 @@ export default function DecisionMessage({
   const showRec = showRecommendationBanner(decision.urgency);
 
   return (
-    <div className="animate-fade-up flex w-full flex-col overflow-hidden rounded-2xl rounded-tl-sm border border-line/60 bg-card shadow-sm">
+    <div className="animate-fade-up flex w-full flex-col rounded-2xl rounded-tl-sm border border-line/60 bg-card shadow-sm">
       {showLeadDisclaimer && (
         <div
           className="flex gap-2.5 border-b border-line/60 bg-muted/35 px-4 py-2.5 text-[11px] leading-snug text-muted-foreground dark:bg-muted/25"
@@ -271,7 +271,7 @@ export default function DecisionMessage({
           </Section>
         )}
 
-        {decision.evidenceSnippets && decision.evidenceSnippets.length > 0 && (
+        {(decision.evidenceSnippets?.length ?? 0) > 0 && (
           <Section
             icon={Link2}
             iconWrap="bg-primary/12 text-primary"
@@ -285,7 +285,7 @@ export default function DecisionMessage({
               proof of a diagnosis or a clinical evidence grade.
             </p>
             <ul className="space-y-3 text-sm">
-              {decision.evidenceSnippets.map((ev, i) => (
+              {decision.evidenceSnippets!.map((ev, i) => (
                 <li
                   key={`${ev.title}-${i}`}
                   className="rounded-lg border border-line/60 bg-muted/25 px-3 py-2.5"

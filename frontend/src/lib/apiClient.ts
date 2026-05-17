@@ -1,4 +1,5 @@
 import { parseApiError } from "./api-error";
+import { normalizeDecisionResponse } from "./decision-normalize";
 import { DecisionRequest, HealthDecisionResponse } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -17,5 +18,6 @@ export async function postHealthDecision(
     throw new Error(parseApiError(data));
   }
 
-  return res.json() as Promise<HealthDecisionResponse>;
+  const raw = (await res.json()) as HealthDecisionResponse;
+  return normalizeDecisionResponse(raw, body.messages);
 }

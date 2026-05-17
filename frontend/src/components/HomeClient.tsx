@@ -5,6 +5,7 @@ import Chat from "@/components/Chat";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import { postHealthDecision } from "@/lib/apiClient";
+import { normalizeDecisionResponse } from "@/lib/decision-normalize";
 import { fetchChatSessions, syncChatSessions } from "@/lib/chats-api";
 import {
   createSession,
@@ -157,7 +158,11 @@ export default function HomeClient() {
       if (!session) return;
       setActiveId(id);
       setMessages(session.messages);
-      setDecision(session.lastDecision ?? null);
+      setDecision(
+        session.lastDecision
+          ? normalizeDecisionResponse(session.lastDecision, session.messages)
+          : null
+      );
     },
     [sessions]
   );

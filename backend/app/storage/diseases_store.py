@@ -46,7 +46,8 @@ def _load_catalog() -> list[dict[str, Any]]:
                 if isinstance(item, dict) and item.get("name")
             ]
         else:
-            _cached_catalog = []
+            # In-memory catalog when GCS is unavailable — keeps search + evidence working.
+            _cached_catalog = _build_seed()
     return _cached_catalog
 
 
