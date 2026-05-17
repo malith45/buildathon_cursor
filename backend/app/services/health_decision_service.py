@@ -57,7 +57,7 @@ def _build_user_content(profile: HealthProfile, messages: list[ChatMessage]) -> 
     )
     return f"""Health profile (you MUST tailor every part of your JSON to this context):
 - Age range: {profile.ageRange}
-- Sex: {profile.sex or "not specified"}
+- Gender: {profile.gender or "not specified"}
 - Chronic conditions: {conditions}
 - Allergies: {allergies}
 - Medications: {profile.medications or "none listed"}
@@ -66,7 +66,7 @@ def _build_user_content(profile: HealthProfile, messages: list[ChatMessage]) -> 
 Conversation:
 {history}
 
-Provide a health decision JSON for the user's latest concern. Explicitly reflect age, sex, pregnancy status, listed conditions, allergies, and medications where relevant in summary, careSteps, education, and redFlags (e.g. OTC avoidance with allergies, pregnancy precautions, age-appropriate guidance)."""
+Provide a health decision JSON for the user's latest concern. Explicitly reflect age, gender, pregnancy status, listed conditions, allergies, and medications where relevant in summary, careSteps, education, and redFlags (e.g. OTC avoidance with allergies, pregnancy precautions, age-appropriate guidance)."""
 
 
 def _parse_decision(raw: str) -> HealthDecisionResponse | None:

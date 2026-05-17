@@ -236,7 +236,7 @@ export default function HomeClient() {
 
   const profileSummary = useMemo(() => {
     const parts: string[] = [profile.ageRange];
-    if (profile.sex) parts.push(profile.sex);
+    if (profile.gender) parts.push(profile.gender);
     if (profile.conditions.length) {
       parts.push(
         `${profile.conditions.length} condition${profile.conditions.length === 1 ? "" : "s"}`

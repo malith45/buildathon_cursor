@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 UrgencyLevel = Literal[
     "self_care", "see_doctor_soon", "urgent_care", "emergency"
@@ -9,7 +9,9 @@ UrgencyLevel = Literal[
 
 class HealthProfile(BaseModel):
     ageRange: str = Field(min_length=1)
-    sex: str | None = None
+    gender: str | None = Field(
+        default=None, validation_alias=AliasChoices("gender", "sex")
+    )
     conditions: list[str] = Field(default_factory=list)
     allergies: list[str] = Field(default_factory=list)
     medications: str = ""

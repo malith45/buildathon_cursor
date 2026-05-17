@@ -235,7 +235,7 @@ def main() -> int:
                     "name": f"{test_name} Updated",
                     "healthProfile": {
                         "ageRange": "35-44",
-                        "sex": "female",
+                        "gender": "female",
                         "conditions": ["Asthma"],
                         "allergies": ["penicillin"],
                         "medications": "albuterol",
@@ -259,7 +259,7 @@ def main() -> int:
                 json={
                     "profile": {
                         "ageRange": "35-44",
-                        "sex": "female",
+                        "gender": "female",
                         "conditions": ["Asthma"],
                         "allergies": [],
                         "medications": "albuterol",

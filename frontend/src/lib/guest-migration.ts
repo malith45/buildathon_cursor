@@ -12,7 +12,7 @@ export function guestProfileDiffersFromDefault(profile: HealthProfile): boolean 
   const d = DEFAULT_PROFILE;
   return (
     profile.ageRange !== d.ageRange ||
-    profile.sex !== d.sex ||
+    profile.gender !== d.gender ||
     profile.pregnant !== d.pregnant ||
     profile.medications.trim() !== d.medications ||
     profile.conditions.length > 0 ||

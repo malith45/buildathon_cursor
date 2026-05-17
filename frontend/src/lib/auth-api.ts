@@ -1,6 +1,18 @@
 import { parseApiError } from "./api-error";
 import { getToken } from "./auth-storage";
-import type { AuthResponse, HealthProfile, User } from "./types";
+import {
+  normalizeHealthProfile,
+  type AuthResponse,
+  type HealthProfile,
+  type User,
+} from "./types";
+
+function normalizeUser(user: User): User {
+  return {
+    ...user,
+    healthProfile: normalizeHealthProfile(user.healthProfile),
+  };
+}
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -42,7 +54,8 @@ export async function login(
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json() as Promise<AuthResponse>;
+  const data = (await res.json()) as AuthResponse;
+  return { ...data, user: normalizeUser(data.user) };
 }
 
 export async function fetchMe(): Promise<User> {
@@ -51,7 +64,7 @@ export async function fetchMe(): Promise<User> {
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as { user: User };
-  return data.user;
+  return normalizeUser(data.user);
 }
 
 export async function updateProfile(updates: {
@@ -65,5 +78,5 @@ export async function updateProfile(updates: {
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as { user: User };
-  return data.user;
+  return normalizeUser(data.user);
 }

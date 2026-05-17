@@ -6,7 +6,7 @@ export type UrgencyLevel =
 
 export interface HealthProfile {
   ageRange: string;
-  sex?: string;
+  gender?: string;
   conditions: string[];
   allergies: string[];
   medications: string;
@@ -72,6 +72,16 @@ export const DEFAULT_PROFILE: HealthProfile = {
   allergies: [],
   medications: "",
 };
+
+/** Maps legacy `sex` field from stored profiles to `gender`. */
+export function normalizeHealthProfile(
+  raw: Partial<HealthProfile> & { sex?: string }
+): HealthProfile {
+  const { sex, ...rest } = raw;
+  const profile: HealthProfile = { ...DEFAULT_PROFILE, ...rest };
+  if (!profile.gender && sex) profile.gender = sex;
+  return profile;
+}
 
 export const URGENCY_LABELS: Record<UrgencyLevel, string> = {
   self_care: "Self-care",

@@ -1,4 +1,4 @@
-import { DEFAULT_PROFILE, HealthProfile } from "./types";
+import { DEFAULT_PROFILE, HealthProfile, normalizeHealthProfile } from "./types";
 
 const STORAGE_KEY = "healthcare_profile";
 
@@ -11,7 +11,7 @@ export function loadProfile(userId?: string | null): HealthProfile {
   try {
     const raw = localStorage.getItem(profileKey(userId));
     if (!raw) return DEFAULT_PROFILE;
-    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    return normalizeHealthProfile(JSON.parse(raw));
   } catch {
     return DEFAULT_PROFILE;
   }
