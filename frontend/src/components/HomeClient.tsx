@@ -1,20 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Chat from "@/components/Chat";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
-import HealthProfileForm from "@/components/HealthProfileForm";
-import SessionList from "@/components/SessionList";
-import TriageCard from "@/components/TriageCard";
-import { checkBackendHealth, postHealthDecision } from "@/lib/apiClient";
+import ChatHistorySidebar from "@/components/ChatHistorySidebar";
+import ProfileDrawer from "@/components/ProfileDrawer";
+import { postHealthDecision } from "@/lib/apiClient";
+import { normalizeDecisionResponse } from "@/lib/decision-normalize";
+import { fetchChatSessions, syncChatSessions } from "@/lib/chats-api";
 import {
   createSession,
   loadSessions,
   saveSessions,
   updateSessionMessages,
   upsertSession,
-  clearAllSessions,
 } from "@/lib/chat-storage";
+import {
+  guestProfileDiffersFromDefault,
+  mergeGuestSessionsIntoAccount,
+  resolveProfileAfterAuth,
+} from "@/lib/guest-migration";
 import { loadProfile, saveProfile } from "@/lib/profile-storage";
 import {
   ChatMessage,
@@ -23,34 +27,160 @@ import {
   HealthDecisionResponse,
   HealthProfile,
 } from "@/lib/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { errorMessage, toast } from "@/lib/toast";
+
+const PROFILE_SYNC_MS = 800;
 
 export default function HomeClient() {
+  const { user, loading: authLoading, updateHealthProfile } = useAuth();
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastGoodSessionsRef = useRef<ChatSession[]>([]);
+  const migratedProfileForUserRef = useRef<string | null>(null);
+  const userId = user?.id ?? null;
 
   useEffect(() => {
-    setProfile(loadProfile());
-    setSessions(loadSessions());
-    checkBackendHealth().then(setBackendOk);
+    if (authLoading) return;
+    let cancelled = false;
+
+    async function load() {
+      if (!cancelled) setHistoryLoading(true);
+      if (user) {
+        const mergedLocal = mergeGuestSessionsIntoAccount(user.id);
+        const nextProfile = resolveProfileAfterAuth(
+          user.healthProfile,
+          user.id
+        );
+        if (!cancelled) setProfile(nextProfile);
+        const shouldSyncGuestProfile =
+          guestProfileDiffersFromDefault(nextProfile) &&
+          migratedProfileForUserRef.current !== user.id;
+        if (shouldSyncGuestProfile) {
+          migratedProfileForUserRef.current = user.id;
+          void updateHealthProfile(nextProfile).catch(() => {
+            /* local copy already saved in resolveProfileAfterAuth */
+          });
+        }
+
+        try {
+          // Show something immediately while cloud fetch resolves.
+          if (!cancelled) setSessions(mergedLocal);
+          let remote = await fetchChatSessions();
+          if (remote.length === 0 && mergedLocal.length > 0) {
+            remote = await syncChatSessions(mergedLocal);
+            toast.success(
+              "Chats synced",
+              "Your local history was saved to your account."
+            );
+          }
+          if (!cancelled) {
+            lastGoodSessionsRef.current = remote;
+            setSessions(remote);
+            saveSessions(remote, user.id);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            const safeFallback =
+              mergedLocal.length > 0 ? mergedLocal : lastGoodSessionsRef.current;
+            setSessions(safeFallback);
+            if (safeFallback.length > 0) {
+              lastGoodSessionsRef.current = safeFallback;
+            }
+            const fallbackCount = mergedLocal.length;
+            toast.warning(
+              "Could not load chats from server",
+              errorMessage(
+                err,
+                safeFallback.length > 0
+                  ? `Showing ${safeFallback.length} local/cached chat${
+                      safeFallback.length === 1 ? "" : "s"
+                    } only.`
+                  : "Cloud chat history unavailable and no local chats found."
+              )
+            );
+          }
+        }
+      } else {
+        migratedProfileForUserRef.current = null;
+        if (!cancelled) {
+          setProfile(loadProfile());
+          const local = loadSessions();
+          lastGoodSessionsRef.current = local;
+          setSessions(local);
+        }
+      }
+      if (!cancelled) {
+        setActiveId(null);
+        setMessages([]);
+        setDecision(null);
+        setHistoryLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, updateHealthProfile]);
+
+  useEffect(() => {
+    return () => {
+      if (profileSyncTimer.current) clearTimeout(profileSyncTimer.current);
+    };
   }, []);
 
   const activeSession = sessions.find((s) => s.id === activeId) ?? null;
 
-  const persistProfile = useCallback((next: HealthProfile) => {
-    setProfile(next);
-    saveProfile(next);
-  }, []);
+  const persistProfile = useCallback(
+    (next: HealthProfile) => {
+      setProfile(next);
+      saveProfile(next, userId);
+      if (!user) return;
 
-  const persistSessions = useCallback((next: ChatSession[]) => {
-    setSessions(next);
-    saveSessions(next);
-  }, []);
+      if (profileSyncTimer.current) clearTimeout(profileSyncTimer.current);
+      profileSyncTimer.current = setTimeout(() => {
+        void updateHealthProfile(next).catch((err) => {
+          toast.warning(
+            "Profile not synced",
+            errorMessage(err, "Changes saved on this device only.")
+          );
+        });
+      }, PROFILE_SYNC_MS);
+    },
+    [user, userId, updateHealthProfile]
+  );
+
+  const persistSessions = useCallback(
+    async (next: ChatSession[]) => {
+      setSessions(next);
+      lastGoodSessionsRef.current = next;
+      saveSessions(next, userId);
+      if (!userId) return;
+      try {
+        const saved = await syncChatSessions(next);
+        lastGoodSessionsRef.current = saved;
+        setSessions(saved);
+        saveSessions(saved, userId);
+      } catch (err) {
+        toast.warning(
+          "Chat not saved online",
+          errorMessage(
+            err,
+            "Saved on this device only. Check storage in the header status panel."
+          )
+        );
+      }
+    },
+    [userId]
+  );
 
   const selectSession = useCallback(
     (id: string) => {
@@ -58,8 +188,11 @@ export default function HomeClient() {
       if (!session) return;
       setActiveId(id);
       setMessages(session.messages);
-      setDecision(session.lastDecision ?? null);
-      setError(null);
+      setDecision(
+        session.lastDecision
+          ? normalizeDecisionResponse(session.lastDecision, session.messages)
+          : null
+      );
     },
     [sessions]
   );
@@ -68,18 +201,25 @@ export default function HomeClient() {
     setActiveId(null);
     setMessages([]);
     setDecision(null);
-    setError(null);
+    toast.info("New chat started");
   }, []);
 
-  const handleClearHistory = useCallback(() => {
-    clearAllSessions();
-    setSessions([]);
-    startNewSession();
-  }, [startNewSession]);
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      const next = sessions.filter((s) => s.id !== id);
+      if (activeId === id) {
+        setActiveId(null);
+        setMessages([]);
+        setDecision(null);
+      }
+      await persistSessions(next);
+      toast.success("Chat deleted");
+    },
+    [sessions, activeId, persistSessions]
+  );
 
   const handleSend = useCallback(
     async (text: string) => {
-      setError(null);
       setLoading(true);
 
       let session = activeSession;
@@ -107,12 +247,20 @@ export default function HomeClient() {
         setDecision(result);
 
         const updated = updateSessionMessages(session, withReply, result);
-        persistSessions(upsertSession(sessions, updated));
+        await persistSessions(upsertSession(sessions, updated));
+        if (result.fallback) {
+          toast.warning(
+            "Limited AI response",
+            "Using safe fallback guidance. Check OPENAI_API_KEY in backend/.env and restart the API."
+          );
+        }
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to reach the backend. Is it running on port 4000?"
+        toast.error(
+          "Could not get guidance",
+          errorMessage(
+            err,
+            "Failed to reach the backend. Is it running on port 4000?"
+          )
         );
       } finally {
         setLoading(false);
@@ -121,42 +269,48 @@ export default function HomeClient() {
     [activeSession, messages, profile, sessions, persistSessions]
   );
 
-  return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-teal-800 dark:text-teal-300">
-          AI Health &amp; Care Decision System
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Powered by Gemini on the backend — triage guidance, care steps, and
-          health education.
-        </p>
-        {backendOk === false && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-            Backend unreachable. Start the server:{" "}
-            <code className="text-xs">cd backend &amp;&amp; npm run dev</code>
-          </p>
-        )}
-        <DisclaimerBanner />
-      </header>
+  const profileSummary = useMemo(() => {
+    const parts: string[] = [profile.ageRange];
+    if (profile.gender) parts.push(profile.gender);
+    if (profile.conditions.length) {
+      parts.push(
+        `${profile.conditions.length} condition${profile.conditions.length === 1 ? "" : "s"}`
+      );
+    }
+    return parts.join(" · ");
+  }, [profile]);
 
-      <div className="grid flex-1 grid-cols-1 gap-6 xl:grid-cols-[220px_280px_1fr_320px]">
-        <SessionList
+  return (
+    <main className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm">
+        <ChatHistorySidebar
           sessions={sessions}
+          loading={historyLoading}
           activeId={activeId}
           onSelect={selectSession}
           onNew={startNewSession}
-          onClear={handleClearHistory}
+          onDeleteSession={handleDeleteSession}
+          user={user ? { name: user.name, email: user.email } : null}
+          profileSummary={profileSummary}
+          onOpenProfile={() => setProfileOpen(true)}
         />
-        <HealthProfileForm profile={profile} onChange={persistProfile} />
-        <Chat
-          messages={messages}
-          onSend={handleSend}
-          loading={loading}
-          error={error}
-        />
-        <TriageCard decision={decision} loading={loading} />
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+          <Chat
+            messages={messages}
+            onSend={handleSend}
+            loading={loading}
+            decision={decision}
+          />
+        </div>
       </div>
-    </div>
+
+      <ProfileDrawer
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        profile={profile}
+        onChange={persistProfile}
+      />
+    </main>
   );
 }

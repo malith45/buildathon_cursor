@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
+import Providers from "@/components/Providers";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,9 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Health & Care Decision System",
-  description:
-    "Gemini-powered health triage, care guidance, and education — not medical advice.",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({
@@ -26,13 +28,37 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-        {children}
-        <footer className="border-t border-zinc-200 py-4 text-center text-xs text-zinc-500 dark:border-zinc-800">
-          Educational use only. Gemini API runs on the backend only.
-        </footer>
+      <body
+        className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground"
+        suppressHydrationWarning
+      >
+        <Script
+          src="/mediassist-hydration-guard.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="/mediassist-theme-init.js"
+          strategy="beforeInteractive"
+        />
+        <div
+          className="pointer-events-none fixed inset-0 -z-10 bg-background"
+          aria-hidden
+          suppressHydrationWarning
+        />
+        <div
+          className="pointer-events-none fixed -top-32 right-0 -z-10 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
+          aria-hidden
+          suppressHydrationWarning
+        />
+        <div
+          className="pointer-events-none fixed -bottom-24 left-0 -z-10 h-80 w-80 rounded-full bg-mint/15 blur-3xl"
+          aria-hidden
+          suppressHydrationWarning
+        />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

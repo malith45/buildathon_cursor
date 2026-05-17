@@ -1,3 +1,5 @@
+import { parseApiError } from "./api-error";
+import { normalizeDecisionResponse } from "./decision-normalize";
 import { DecisionRequest, HealthDecisionResponse } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -13,19 +15,9 @@ export async function postHealthDecision(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(
-      (data as { error?: string }).error ?? "Backend request failed"
-    );
+    throw new Error(parseApiError(data));
   }
 
-  return res.json() as Promise<HealthDecisionResponse>;
-}
-
-export async function checkBackendHealth(): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE}/api/health`, { method: "GET" });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  const raw = (await res.json()) as HealthDecisionResponse;
+  return normalizeDecisionResponse(raw, body.messages);
 }

@@ -1,10 +1,25 @@
 "use client";
 
 import { HealthProfile } from "@/lib/types";
+import { sectionSubtitle, sectionTitle } from "@/lib/ui";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DiseaseMultiSelect from "@/components/DiseaseMultiSelect";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   profile: HealthProfile;
   onChange: (profile: HealthProfile) => void;
+  embedded?: boolean;
 }
 
 const AGE_RANGES = [
@@ -17,68 +32,91 @@ const AGE_RANGES = [
   "65+",
 ];
 
-export default function HealthProfileForm({ profile, onChange }: Props) {
+const GENDER_UNSPECIFIED = "unspecified";
+
+const GENDER_OPTIONS = [
+  { value: GENDER_UNSPECIFIED, label: "Prefer not to say" },
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "other", label: "Other" },
+] as const;
+
+export default function HealthProfileForm({
+  profile,
+  onChange,
+  embedded = false,
+}: Props) {
   const update = (partial: Partial<HealthProfile>) =>
     onChange({ ...profile, ...partial });
 
-  return (
-    <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="text-lg font-semibold">Health profile</h2>
+  const showPregnant = profile.gender !== "male";
 
-      <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Age range
-        </span>
-        <select
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+  const fields = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="age-range">Age range</Label>
+        <Select
           value={profile.ageRange}
-          onChange={(e) => update({ ageRange: e.target.value })}
+          onValueChange={(value) => {
+            if (value) update({ ageRange: value });
+          }}
         >
-          {AGE_RANGES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger id="age-range" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AGE_RANGES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Sex (optional)
-        </span>
-        <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
-          value={profile.sex ?? ""}
-          onChange={(e) => update({ sex: e.target.value || undefined })}
-          placeholder="e.g. female, male"
-        />
-      </label>
-
-      <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Chronic conditions (comma-separated)
-        </span>
-        <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
-          value={profile.conditions.join(", ")}
-          onChange={(e) =>
-            update({
-              conditions: e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
+      <div className="space-y-2">
+        <Label htmlFor="gender">Gender (optional)</Label>
+        <Select
+          value={
+            profile.gender &&
+            GENDER_OPTIONS.some((o) => o.value === profile.gender)
+              ? profile.gender
+              : GENDER_UNSPECIFIED
           }
-          placeholder="e.g. asthma, diabetes"
-        />
-      </label>
+          onValueChange={(value) => {
+            if (!value) return;
+            const gender = value === GENDER_UNSPECIFIED ? undefined : value;
+            update({
+              gender,
+              ...(gender === "male" ? { pregnant: undefined } : {}),
+            });
+          }}
+        >
+          <SelectTrigger id="gender" className="w-full">
+            <SelectValue placeholder="Select gender" />
+          </SelectTrigger>
+          <SelectContent>
+            {GENDER_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Allergies (comma-separated)
-        </span>
-        <input
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+      <div className="space-y-2">
+        <DiseaseMultiSelect
+          id="conditions"
+          value={profile.conditions}
+          onChange={(conditions) => update({ conditions })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="allergies">Allergies</Label>
+        <Input
+          id="allergies"
           value={profile.allergies.join(", ")}
           onChange={(e) =>
             update({
@@ -90,29 +128,48 @@ export default function HealthProfileForm({ profile, onChange }: Props) {
           }
           placeholder="e.g. penicillin"
         />
-      </label>
+      </div>
 
-      <label className="block text-sm">
-        <span className="mb-1 block text-zinc-600 dark:text-zinc-400">
-          Medications (free text)
-        </span>
-        <textarea
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950"
+      <div className="space-y-2">
+        <Label htmlFor="medications">Medications</Label>
+        <Textarea
+          id="medications"
           rows={2}
           value={profile.medications}
           onChange={(e) => update({ medications: e.target.value })}
           placeholder="List any medications you take"
         />
-      </label>
+      </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={!!profile.pregnant}
-          onChange={(e) => update({ pregnant: e.target.checked })}
-        />
-        Currently pregnant
-      </label>
-    </section>
+      {showPregnant && (
+        <div className="animate-fade-in flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3">
+          <Checkbox
+            id="pregnant"
+            checked={!!profile.pregnant}
+            onCheckedChange={(checked) =>
+              update({ pregnant: checked === true })
+            }
+          />
+          <Label htmlFor="pregnant" className="cursor-pointer font-normal">
+            Currently pregnant
+          </Label>
+        </div>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{fields}</div>;
+  }
+
+  return (
+    <Card className="shadow-(--shadow-card)">
+      <CardHeader className="border-b">
+        <p className={sectionSubtitle}>Context</p>
+        <CardTitle className={sectionTitle}>Health profile</CardTitle>
+        <CardDescription>Helps tailor guidance to you.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">{fields}</CardContent>
+    </Card>
   );
 }

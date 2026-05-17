@@ -1,26 +1,287 @@
 @import "tailwindcss";
+@import "../../node_modules/tw-animate-css/dist/tw-animate.css";
+@import "../../node_modules/shadcn/dist/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Match .dark on <html> and all descendants so utilities + tokens apply app-wide */
+@custom-variant dark (&:is(.dark, .dark *));
+
+/* MediAssist AI palette + shadcn semantic tokens */
+@theme {
+  --color-brand: #5b6cff;
+  --color-mint: #3ed6a0;
+  --color-canvas: #fafaf7;
+  --color-sand: #f1ede6;
+  --color-ink: #2b2f36;
+  --color-lavender: #b7a6ff;
+  --color-coral: #ff6b6b;
+  --color-stone: #5c6370;
+  --color-line: #e0dbd2;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --shadow-card: 0 4px 24px rgba(43, 47, 54, 0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: #fafaf7;
+  --foreground: #2b2f36;
+  --card: #ffffff;
+  --card-foreground: #2b2f36;
+  --popover: #ffffff;
+  --popover-foreground: #2b2f36;
+  --primary: #5b6cff;
+  --primary-foreground: #ffffff;
+  --secondary: #e8faf3;
+  --secondary-foreground: #2b2f36;
+  --muted: #f1ede6;
+  --muted-foreground: #5c6370;
+  --accent: #ede9ff;
+  --accent-foreground: #2b2f36;
+  --destructive: #ff6b6b;
+  --border: #e0dbd2;
+  --input: #e0dbd2;
+  --ring: #5b6cff;
+  --radius: 0.75rem;
+  --chart-1: #5b6cff;
+  --chart-2: #3ed6a0;
+  --chart-3: #b7a6ff;
+  --chart-4: #ff6b6b;
+  --chart-5: #5c6370;
+  --sidebar: #fafaf7;
+  --sidebar-foreground: #2b2f36;
+  --sidebar-primary: #5b6cff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1ede6;
+  --sidebar-accent-foreground: #2b2f36;
+  --sidebar-border: #e0dbd2;
+  --sidebar-ring: #5b6cff;
+  --color-line: #e0dbd2;
+  --shadow-card: 0 4px 24px rgba(43, 47, 54, 0.06);
+  /* Body backdrop gradients — overridden in .dark */
+  --bg-grad-1: rgba(91, 108, 255, 0.06);
+  --bg-grad-2: rgba(62, 214, 160, 0.07);
+  --bg-grad-3: rgba(183, 166, 255, 0.05);
+}
+
+.dark {
+  /* Surfaces — desaturated near-black with subtle warm tint, premium "OLED-ish" */
+  --background: #0e1014;
+  --foreground: #e8ecf2;
+  --card: #161a21;
+  --card-foreground: #e8ecf2;
+  --popover: #1a1f27;
+  --popover-foreground: #e8ecf2;
+
+  /* Brand colors slightly brightened for dark backgrounds */
+  --primary: #7a87ff;
+  --primary-foreground: #0e1014;
+  --secondary: #1c2a25;
+  --secondary-foreground: #e8ecf2;
+  --muted: #1d222b;
+  --muted-foreground: #9aa3b2;
+  --accent: #221d33;
+  --accent-foreground: #e8ecf2;
+  --destructive: #ff8585;
+
+  /* Hairlines — slightly visible on dark surfaces */
+  --border: #262c36;
+  --input: #262c36;
+  --ring: #7a87ff;
+
+  --chart-1: #7a87ff;
+  --chart-2: #5ae0b3;
+  --chart-3: #c8baff;
+  --chart-4: #ff8585;
+  --chart-5: #9aa3b2;
+
+  --sidebar: #0e1014;
+  --sidebar-foreground: #e8ecf2;
+  --sidebar-primary: #7a87ff;
+  --sidebar-primary-foreground: #0e1014;
+  --sidebar-accent: #1d222b;
+  --sidebar-accent-foreground: #e8ecf2;
+  --sidebar-border: #262c36;
+  --sidebar-ring: #7a87ff;
+
+  --color-line: #262c36;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.45);
+
+  /* More muted gradients on dark — keeps colour without washing out the depth */
+  --bg-grad-1: rgba(122, 135, 255, 0.08);
+  --bg-grad-2: rgba(90, 224, 179, 0.06);
+  --bg-grad-3: rgba(200, 186, 255, 0.05);
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+::selection {
+  background-color: rgba(183, 166, 255, 0.45);
+}
+
+.dark ::selection {
+  background-color: rgba(122, 135, 255, 0.45);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply min-h-full bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(at 8% 0%, var(--bg-grad-1) 0px, transparent 45%),
+      radial-gradient(at 92% 10%, var(--bg-grad-2) 0px, transparent 45%),
+      radial-gradient(at 50% 100%, var(--bg-grad-3) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .bg-mesh {
+    background-image:
+      radial-gradient(at 0% 0%, rgba(91, 108, 255, 0.12) 0px, transparent 40%),
+      radial-gradient(at 100% 0%, rgba(62, 214, 160, 0.10) 0px, transparent 40%),
+      radial-gradient(at 50% 100%, rgba(183, 166, 255, 0.08) 0px, transparent 50%);
+  }
+  html.dark .bg-mesh {
+    background-image:
+      radial-gradient(at 0% 0%, rgba(122, 135, 255, 0.14) 0px, transparent 40%),
+      radial-gradient(at 100% 0%, rgba(90, 224, 179, 0.08) 0px, transparent 40%),
+      radial-gradient(at 50% 100%, rgba(200, 186, 255, 0.06) 0px, transparent 50%);
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(92, 99, 112, 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(92, 99, 112, 0.25);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(92, 99, 112, 0.45);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.35s ease-out both;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  display: inline-block;
+  animation: bounce-dot 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
 }
