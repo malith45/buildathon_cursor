@@ -44,12 +44,3 @@ export async function syncChatSessions(
   return data.sessions ?? [];
 }
 
-export async function clearChatSessions(): Promise<void> {
-  const res = await fetch(`${BASE}/api/chats`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (!res.ok && res.status !== 204) {
-    throw new Error(await parseError(res));
-  }
-}

@@ -285,3 +285,12 @@ html.dark {
 .typing-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-slide-in-right,
+  .typing-dot {
+    animation: none !important;
+  }
+}

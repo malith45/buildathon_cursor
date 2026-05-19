@@ -1,13 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/lib/use-media-query";
 import Chat from "@/components/Chat";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ProfileDrawer from "@/components/ProfileDrawer";
 import { postHealthDecision } from "@/lib/apiClient";
-import { normalizeDecisionResponse } from "@/lib/decision-normalize";
+import {
+  hydrateAllSessions,
+  hydrateSessionDecisions,
+  messagesForApi,
+  withModelReply,
+} from "@/lib/chat-messages";
 import { fetchChatSessions, syncChatSessions } from "@/lib/chats-api";
 import {
+  clearAllSessions,
   createSession,
   loadSessions,
   saveSessions,
@@ -24,7 +31,6 @@ import {
   ChatMessage,
   ChatSession,
   DEFAULT_PROFILE,
-  HealthDecisionResponse,
   HealthProfile,
 } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,14 +44,30 @@ export default function HomeClient() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [decision, setDecision] = useState<HealthDecisionResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const retryTextRef = useRef<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGoodSessionsRef = useRef<ChatSession[]>([]);
   const migratedProfileForUserRef = useRef<string | null>(null);
   const userId = user?.id ?? null;
+  const isMobile = useIsMobile();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile) setMobileSidebarOpen(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !mobileSidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobile, mobileSidebarOpen]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -82,9 +104,10 @@ export default function HomeClient() {
             );
           }
           if (!cancelled) {
-            lastGoodSessionsRef.current = remote;
-            setSessions(remote);
-            saveSessions(remote, user.id);
+            const hydrated = hydrateAllSessions(remote);
+            lastGoodSessionsRef.current = hydrated;
+            setSessions(hydrated);
+            saveSessions(hydrated, user.id);
           }
         } catch (err) {
           if (!cancelled) {
@@ -94,7 +117,6 @@ export default function HomeClient() {
             if (safeFallback.length > 0) {
               lastGoodSessionsRef.current = safeFallback;
             }
-            const fallbackCount = mergedLocal.length;
             toast.warning(
               "Could not load chats from server",
               errorMessage(
@@ -112,7 +134,7 @@ export default function HomeClient() {
         migratedProfileForUserRef.current = null;
         if (!cancelled) {
           setProfile(loadProfile());
-          const local = loadSessions();
+          const local = hydrateAllSessions(loadSessions());
           lastGoodSessionsRef.current = local;
           setSessions(local);
         }
@@ -120,7 +142,7 @@ export default function HomeClient() {
       if (!cancelled) {
         setActiveId(null);
         setMessages([]);
-        setDecision(null);
+        setSendError(null);
         setHistoryLoading(false);
       }
     }
@@ -158,11 +180,17 @@ export default function HomeClient() {
     [user, userId, updateHealthProfile]
   );
 
-  const persistSessions = useCallback(
-    async (next: ChatSession[]) => {
+  const persistSessionsLocal = useCallback(
+    (next: ChatSession[]) => {
       setSessions(next);
       lastGoodSessionsRef.current = next;
       saveSessions(next, userId);
+    },
+    [userId]
+  );
+
+  const syncSessionsToCloud = useCallback(
+    async (next: ChatSession[]) => {
       if (!userId) return;
       try {
         const saved = await syncChatSessions(next);
@@ -174,7 +202,7 @@ export default function HomeClient() {
           "Chat not saved online",
           errorMessage(
             err,
-            "Saved on this device only. Check storage in the header status panel."
+            "Saved on this device only. Sign in and check cloud storage settings if you need sync."
           )
         );
       }
@@ -182,17 +210,22 @@ export default function HomeClient() {
     [userId]
   );
 
+  const persistSessions = useCallback(
+    async (next: ChatSession[]) => {
+      persistSessionsLocal(next);
+      await syncSessionsToCloud(next);
+    },
+    [persistSessionsLocal, syncSessionsToCloud]
+  );
+
   const selectSession = useCallback(
     (id: string) => {
       const session = sessions.find((s) => s.id === id);
       if (!session) return;
+      const hydrated = hydrateSessionDecisions(session);
       setActiveId(id);
-      setMessages(session.messages);
-      setDecision(
-        session.lastDecision
-          ? normalizeDecisionResponse(session.lastDecision, session.messages)
-          : null
-      );
+      setMessages(hydrated.messages);
+      setSendError(null);
     },
     [sessions]
   );
@@ -200,7 +233,7 @@ export default function HomeClient() {
   const startNewSession = useCallback(() => {
     setActiveId(null);
     setMessages([]);
-    setDecision(null);
+    setSendError(null);
     toast.info("New chat started");
   }, []);
 
@@ -210,7 +243,7 @@ export default function HomeClient() {
       if (activeId === id) {
         setActiveId(null);
         setMessages([]);
-        setDecision(null);
+        setSendError(null);
       }
       await persistSessions(next);
       toast.success("Chat deleted");
@@ -221,6 +254,8 @@ export default function HomeClient() {
   const handleSend = useCallback(
     async (text: string) => {
       setLoading(true);
+      setSendError(null);
+      retryTextRef.current = text;
 
       let session = activeSession;
       if (!session) {
@@ -235,39 +270,67 @@ export default function HomeClient() {
       try {
         const result = await postHealthDecision({
           profile,
-          messages: nextMessages,
+          messages: messagesForApi(nextMessages),
         });
 
-        const assistantSummary: ChatMessage = {
-          role: "model",
-          text: result.summary,
-        };
-        const withReply = [...nextMessages, assistantSummary];
+        const withReply = withModelReply(nextMessages, result.summary, result);
         setMessages(withReply);
-        setDecision(result);
 
         const updated = updateSessionMessages(session, withReply, result);
-        await persistSessions(upsertSession(sessions, updated));
+        const merged = upsertSession(sessions, updated);
+        persistSessionsLocal(merged);
+        retryTextRef.current = null;
         if (result.fallback) {
           toast.warning(
             "Limited AI response",
-            "Using safe fallback guidance. Check OPENAI_API_KEY in backend/.env and restart the API."
+            "Using safe fallback guidance. Tap Try again or check OPENAI_API_KEY on the API server."
           );
         }
+        void syncSessionsToCloud(merged);
       } catch (err) {
-        toast.error(
-          "Could not get guidance",
-          errorMessage(
-            err,
-            "Failed to reach the backend. Is it running on port 4000?"
-          )
+        setMessages(messages);
+        const msg = errorMessage(
+          err,
+          "Failed to reach the backend. Is it running on port 4000?"
         );
+        setSendError(msg);
+        toast.error("Could not get guidance", msg);
       } finally {
         setLoading(false);
       }
     },
-    [activeSession, messages, profile, sessions, persistSessions]
+    [activeSession, messages, profile, sessions, persistSessionsLocal, syncSessionsToCloud]
   );
+
+  const handleRetrySend = useCallback(() => {
+    const text = retryTextRef.current;
+    if (text) void handleSend(text);
+  }, [handleSend]);
+
+  const handleRequestFreshGuidance = useCallback(() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) void handleSend(lastUser.text);
+  }, [messages, handleSend]);
+
+  const handleClearAllChats = useCallback(async () => {
+    clearAllSessions(userId);
+    setSessions([]);
+    setActiveId(null);
+    setMessages([]);
+    setSendError(null);
+    if (userId) {
+      try {
+        await syncChatSessions([]);
+      } catch (err) {
+        toast.warning(
+          "Cleared locally",
+          errorMessage(err, "Could not clear chats on the server.")
+        );
+        return;
+      }
+    }
+    toast.success("All chats cleared");
+  }, [userId]);
 
   const profileSummary = useMemo(() => {
     const parts: string[] = [profile.ageRange];
@@ -280,9 +343,11 @@ export default function HomeClient() {
     return parts.join(" · ");
   }, [profile]);
 
+  const profileIsDefault = !guestProfileDiffersFromDefault(profile);
+
   return (
-    <main className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-2 overflow-hidden px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm">
+    <main className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-2 overflow-hidden px-2 py-2 sm:gap-3 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm sm:rounded-2xl">
         <ChatHistorySidebar
           sessions={sessions}
           loading={historyLoading}
@@ -290,17 +355,30 @@ export default function HomeClient() {
           onSelect={selectSession}
           onNew={startNewSession}
           onDeleteSession={handleDeleteSession}
+          onClearAll={sessions.length > 0 ? handleClearAllChats : undefined}
           user={user ? { name: user.name, email: user.email } : null}
           profileSummary={profileSummary}
           onOpenProfile={() => setProfileOpen(true)}
+          isMobile={isMobile}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 sm:p-3 md:p-4">
           <Chat
             messages={messages}
+            activeSession={activeSession}
             onSend={handleSend}
             loading={loading}
-            decision={decision}
+            profileIsDefault={profileIsDefault}
+            onOpenProfile={() => setProfileOpen(true)}
+            sendError={sendError}
+            onRetrySend={handleRetrySend}
+            onDismissSendError={() => setSendError(null)}
+            onRequestFreshGuidance={handleRequestFreshGuidance}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            onNewChat={startNewSession}
+            showMobileNav={isMobile}
           />
         </div>
       </div>

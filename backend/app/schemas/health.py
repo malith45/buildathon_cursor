@@ -21,6 +21,7 @@ class HealthProfile(BaseModel):
 class ChatMessage(BaseModel):
     role: Literal["user", "model"]
     text: str = Field(min_length=1)
+    decision: "HealthDecisionResponse | None" = None
 
 
 class EvidenceSnippet(BaseModel):

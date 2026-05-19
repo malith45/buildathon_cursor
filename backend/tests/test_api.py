@@ -24,22 +24,6 @@ def test_health_check():
     assert "storageConnected" in data
 
 
-@patch("app.routers.health.openai_service.probe_openai")
-def test_health_check_ai_probe(mock_probe):
-    mock_probe.return_value = {
-        "configured": True,
-        "working": True,
-        "message": "Connected via gpt-4o-mini",
-        "model": "gpt-4o-mini",
-        "sample": "OK",
-    }
-    res = client.get("/api/health?probe=true")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["ai"]["working"] is True
-    mock_probe.assert_called_once()
-
-
 def test_decision_validation_400():
     res = client.post("/api/health/decision", json={"profile": {}, "messages": []})
     assert res.status_code == 400
@@ -145,3 +129,46 @@ def test_chat_sync_rejects_invalid_session_id():
         assert res.status_code == 400
     finally:
         app.dependency_overrides.clear()
+
+
+@patch("app.services.health_decision_service.openai_service.generate_json")
+def test_decision_rate_limit_429(mock_generate):
+    mock_generate.return_value = """{
+        "urgency": "self_care",
+        "summary": "Rest.",
+        "careSteps": ["Hydrate"],
+        "education": ["Monitor"],
+        "redFlags": [],
+        "disclaimer": "Educational only."
+    }"""
+    from app.rate_limit import _hits
+
+    _hits.clear()
+    for _ in range(30):
+        res = client.post(
+            "/api/health/decision",
+            json={
+                "profile": {
+                    "ageRange": "25-34",
+                    "conditions": [],
+                    "allergies": [],
+                    "medications": "",
+                },
+                "messages": [{"role": "user", "text": "headache"}],
+            },
+        )
+        assert res.status_code == 200
+    res = client.post(
+        "/api/health/decision",
+        json={
+            "profile": {
+                "ageRange": "25-34",
+                "conditions": [],
+                "allergies": [],
+                "medications": "",
+            },
+            "messages": [{"role": "user", "text": "headache again"}],
+        },
+    )
+    assert res.status_code == 429
+    _hits.clear()

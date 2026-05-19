@@ -1,3 +1,4 @@
+import { hydrateSessionDecisions } from "@/lib/chat-messages";
 import { ChatMessage, ChatSession, HealthDecisionResponse } from "./types";
 import { createUuid } from "./uuid";
 
@@ -12,7 +13,8 @@ export function loadSessions(userId?: string | null): ChatSession[] {
   try {
     const raw = localStorage.getItem(sessionsKey(userId));
     if (!raw) return [];
-    return JSON.parse(raw) as ChatSession[];
+    const sessions = JSON.parse(raw) as ChatSession[];
+    return sessions.map(hydrateSessionDecisions);
   } catch {
     return [];
   }
@@ -57,12 +59,13 @@ export function updateSessionMessages(
   messages: ChatMessage[],
   lastDecision?: HealthDecisionResponse
 ): ChatSession {
-  return {
+  const hydrated = hydrateSessionDecisions({
     ...session,
     messages,
     lastDecision: lastDecision ?? session.lastDecision,
     updatedAt: new Date().toISOString(),
-  };
+  });
+  return hydrated;
 }
 
 export function clearAllSessions(userId?: string | null): void {

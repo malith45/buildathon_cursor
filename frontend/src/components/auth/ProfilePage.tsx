@@ -101,7 +101,7 @@ function ProfileForm({
               className="bg-muted/50"
             />
             <p className="text-xs text-muted-foreground">
-              Email cannot be changed in this demo.
+              Your sign-in email is used for account recovery.
             </p>
           </div>
         </CardContent>

@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ChatSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import {
   Loader2,
-  MessagesSquare,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
-  Sliders,
+  SquarePen,
   Trash2,
+  UserRound,
 } from "lucide-react";
 
 const STORAGE_KEY = "mediassist_chat_sidebar_expanded";
@@ -36,9 +42,14 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDeleteSession: (id: string) => void;
+  onClearAll?: () => void;
   user?: { name: string; email: string } | null;
   profileSummary?: string;
   onOpenProfile?: () => void;
+  /** Mobile drawer: sidebar overlays chat instead of sitting inline. */
+  isMobile?: boolean;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function initials(name: string): string {
@@ -48,20 +59,13 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** First meaningful character for a tiny collapsed-list badge (no chat icon). */
-function chatTitleInitial(title: string): string {
-  const t = title.trim();
-  const m = t.match(/[A-Za-z0-9]/);
-  return m ? m[0]!.toUpperCase() : "?";
-}
-
 type GroupKey = "today" | "yesterday" | "thisWeek" | "earlier";
 
 const GROUP_LABELS: Record<GroupKey, string> = {
   today: "Today",
   yesterday: "Yesterday",
-  thisWeek: "Earlier this week",
-  earlier: "Earlier",
+  thisWeek: "Previous 7 days",
+  earlier: "Older",
 };
 
 function startOfDay(d: Date) {
@@ -80,19 +84,66 @@ function getGroupKey(date: Date): GroupKey {
   return "earlier";
 }
 
-function formatTime(updatedAt: string): string {
-  const d = new Date(updatedAt);
-  const now = new Date();
-  if (startOfDay(d) === startOfDay(now)) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+function SidebarToggle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+      title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+      className="size-9 shrink-0 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+    >
+      {expanded ? (
+        <PanelLeftClose className="size-[18px]" />
+      ) : (
+        <PanelLeftOpen className="size-[18px]" />
+      )}
+    </Button>
+  );
+}
+
+function NewChatButton({
+  expanded,
+  onNew,
+}: {
+  expanded: boolean;
+  onNew: () => void;
+}) {
+  if (expanded) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onNew}
+        className="h-10 w-full justify-start gap-2 rounded-lg border-sidebar-border bg-transparent px-3 text-sm font-normal shadow-none hover:bg-sidebar-accent"
+      >
+        <SquarePen className="size-4 shrink-0 opacity-80" />
+        New chat
+      </Button>
+    );
   }
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={onNew}
+      aria-label="New chat"
+      title="New chat"
+      className="size-9 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+    >
+      <SquarePen className="size-[18px]" />
+    </Button>
+  );
 }
 
 export default function ChatHistorySidebar({
@@ -102,25 +153,58 @@ export default function ChatHistorySidebar({
   onSelect,
   onNew,
   onDeleteSession,
+  onClearAll,
   user = null,
   profileSummary = "",
   onOpenProfile,
+  isMobile = false,
+  mobileOpen = false,
+  onMobileClose,
 }: Props) {
-  const expanded = useSyncExternalStore(
+  const storedExpanded = useSyncExternalStore(
     subscribeSidebarExpanded,
     readSidebarExpanded,
     () => true
   );
+  const [sidebarReady, setSidebarReady] = useState(false);
+  useEffect(() => setSidebarReady(true), []);
+  const expanded = sidebarReady ? storedExpanded : true;
+  const showExpanded = isMobile ? true : expanded;
+
   const [pendingDelete, setPendingDelete] = useState<{
     id: string;
     title: string;
   } | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const toggle = useCallback(() => {
+    if (isMobile) {
+      onMobileClose?.();
+      return;
+    }
     const next = !readSidebarExpanded();
     localStorage.setItem(STORAGE_KEY, String(next));
     window.dispatchEvent(new Event(SIDEBAR_EXPANDED_EVENT));
-  }, []);
+  }, [isMobile, onMobileClose]);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      onSelect(id);
+      if (isMobile) onMobileClose?.();
+    },
+    [onSelect, isMobile, onMobileClose]
+  );
+
+  const handleNew = useCallback(() => {
+    onNew();
+    if (isMobile) onMobileClose?.();
+  }, [onNew, isMobile, onMobileClose]);
+
+  const handleOpenProfile = useCallback(() => {
+    onOpenProfile?.();
+    if (isMobile) onMobileClose?.();
+  }, [onOpenProfile, isMobile, onMobileClose]);
 
   const grouped = useMemo(() => {
     const groups: Record<GroupKey, ChatSession[]> = {
@@ -130,309 +214,227 @@ export default function ChatHistorySidebar({
       earlier: [],
     };
     for (const s of sessions) {
-      const key = getGroupKey(new Date(s.updatedAt));
-      groups[key].push(s);
+      groups[getGroupKey(new Date(s.updatedAt))].push(s);
     }
     return groups;
   }, [sessions]);
 
-  const widthClass = expanded ? "w-[268px]" : "w-[56px]";
-
-  return (
-    <aside
-      className={cn(
-        "flex h-full min-h-0 shrink-0 flex-col border-r border-line/70 bg-sidebar/90 transition-[width] duration-200 ease-in-out",
-        widthClass
-      )}
-      aria-label="Chat history sidebar"
-      suppressHydrationWarning
-    >
-      {/* Top chrome — fixed, does not scroll */}
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-2 border-b border-line/60 bg-card/80",
-          expanded ? "px-3 py-2.5" : "flex-col gap-1.5 px-1.5 py-2"
-        )}
-      >
-        <Button
+  const renderExpandedRow = (s: ChatSession) => {
+    const isActive = activeId === s.id;
+    return (
+      <li key={s.id} className="group relative">
+        <button
           type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={toggle}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Minimize chat history" : "Expand chat history"}
-          title={expanded ? "Minimize sidebar" : "Expand sidebar"}
+          onClick={() => handleSelect(s.id)}
           className={cn(
-            "shrink-0",
-            !expanded &&
-              "size-9 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            "flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] leading-snug transition-colors",
+            isActive
+              ? "bg-sidebar-accent font-medium text-sidebar-foreground"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70"
           )}
         >
-          {expanded ? (
-            <PanelLeftClose className="size-4" />
-          ) : (
-            <PanelLeftOpen className="size-4" />
-          )}
-        </Button>
-
-        {expanded ? (
-          <>
-            <div className="min-w-0 flex-1">
-              <p className="font-heading text-sm font-semibold leading-tight">
-                Chats
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
-                {loading
-                  ? "Loading history…"
-                  : sessions.length === 0
-                  ? "No conversations yet"
-                  : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`}
-              </p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={onNew}
-              className="shrink-0 shadow-sm"
-            >
-              <Plus className="size-3.5" />
-              New
-            </Button>
-          </>
-        ) : (
+          <span className="line-clamp-2 min-w-0 flex-1">{s.title}</span>
+        </button>
+        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <Button
             type="button"
-            size="icon"
-            onClick={onNew}
-            aria-label="New chat"
-            title="New chat"
-            className="size-9 shrink-0 rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20 transition hover:bg-primary/90"
+            variant="ghost"
+            size="icon-sm"
+            className="size-7 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            aria-label={`Options for ${s.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpenId(menuOpenId === s.id ? null : s.id);
+            }}
           >
-            <Plus className="size-[18px] stroke-[2.5]" />
+            <MoreHorizontal className="size-3.5" />
           </Button>
-        )}
-      </div>
-
-      {/* Only this region scrolls — list / empty state */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div
-          className={cn(
-            "scrollbar-thin h-full min-h-0 overflow-y-auto overscroll-y-contain",
-            !expanded && "px-1.5 py-2"
-          )}
-        >
-        {expanded ? (
-          loading ? (
-            <div className="flex h-full flex-col items-center justify-center px-4 py-8 text-center">
-              <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/70">
-                <Loader2 className="size-5 animate-spin" />
-              </div>
-              <p className="text-xs font-medium text-foreground/70">
-                Loading chat history…
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                Fetching your saved conversations.
-              </p>
-            </div>
-          ) : sessions.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center px-4 py-8 text-center">
-              <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/70">
-                <MessagesSquare className="size-5" />
-              </div>
-              <p className="text-xs font-medium text-foreground/70">
-                No chats yet
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                Send your first symptom message to start a conversation.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 py-2">
-              {(Object.keys(GROUP_LABELS) as GroupKey[]).map((key) => {
-                const group = grouped[key];
-                if (group.length === 0) return null;
-                return (
-                  <div key={key} className="space-y-0.5">
-                    <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {GROUP_LABELS[key]}
-                    </p>
-                    <ul className="space-y-0.5 px-2">
-                      {group.map((s) => (
-                        <li key={s.id}>
-                          <div
-                            className={cn(
-                              "group/row flex w-full items-stretch rounded-lg px-0.5 py-0.5 transition-colors",
-                              activeId === s.id
-                                ? "bg-primary/10 ring-1 ring-primary/25"
-                                : "hover:bg-muted/50"
-                            )}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => onSelect(s.id)}
-                              className={cn(
-                                "min-w-0 flex-1 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-                                activeId === s.id
-                                  ? "text-foreground"
-                                  : "text-foreground/80"
-                              )}
-                            >
-                              <p className="line-clamp-2 text-[13px] font-medium leading-tight">
-                                {s.title}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                                {formatTime(s.updatedAt)} · {s.messages.length}{" "}
-                                message
-                                {s.messages.length === 1 ? "" : "s"}
-                              </p>
-                            </button>
-                            <button
-                              type="button"
-                              className="shrink-0 rounded-md text-destructive opacity-100 transition-opacity hover:bg-destructive/15 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-visible:opacity-100"
-                              aria-label={`Delete chat: ${s.title}`}
-                              title="Delete chat"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setPendingDelete({
-                                  id: s.id,
-                                  title: s.title,
-                                });
-                              }}
-                            >
-                              <span className="flex size-8 shrink-0 items-center justify-center rounded-md">
-                                <Trash2 className="size-3.5" />
-                              </span>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          <ul
-            className="flex flex-col items-stretch gap-1 px-1"
-            aria-label="Chat sessions"
-          >
-            {loading ? (
-              <li className="flex justify-center py-6">
-                <div className="flex size-9 items-center justify-center rounded-xl border border-dashed border-line/60 bg-muted/30 text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin opacity-80" aria-hidden />
-                </div>
-              </li>
-            ) : sessions.length === 0 ? (
-              <li className="flex justify-center py-6">
-                <div className="flex size-9 items-center justify-center rounded-xl border border-dashed border-line/60 bg-muted/30 text-muted-foreground">
-                  <MessagesSquare className="size-4 opacity-60" aria-hidden />
-                </div>
-              </li>
-            ) : (
-              sessions.map((s) => (
-                <li
-                  key={s.id}
-                  className="group/session flex w-full items-center justify-between gap-1 px-0.5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(s.id)}
-                    aria-label={s.title}
-                    title={s.title}
-                    className={cn(
-                      "flex size-6 shrink-0 items-center justify-center rounded-lg border text-[10px] font-semibold transition-colors",
-                      activeId === s.id
-                        ? "border-primary/35 bg-primary/15 text-primary ring-1 ring-primary/25"
-                        : "border-transparent bg-muted/25 text-muted-foreground hover:border-line/50 hover:bg-muted/60 hover:text-foreground"
-                    )}
-                  >
-                    {chatTitleInitial(s.title)}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-md border border-line/60 bg-card text-destructive shadow-sm transition-opacity hover:bg-destructive/15 sm:opacity-0 sm:group-hover/session:opacity-100 sm:focus-visible:opacity-100"
-                    aria-label={`Delete chat: ${s.title}`}
-                    title="Delete chat"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setPendingDelete({ id: s.id, title: s.title });
-                    }}
-                  >
-                    <Trash2 className="size-2.5" />
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        )}
         </div>
-      </div>
+        {menuOpenId === s.id ? (
+          <div
+            className="absolute right-2 top-full z-10 mt-0.5 min-w-[7.5rem] rounded-lg border border-border bg-card py-1 shadow-lg"
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                setMenuOpenId(null);
+                setPendingDelete({ id: s.id, title: s.title });
+              }}
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </li>
+    );
+  };
 
-      {/* Bottom dock — health profile (guests + signed-in) */}
-      {onOpenProfile ? (
+  return (
+    <>
+      {isMobile && mobileOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-[2px] md:hidden"
+          aria-label="Close chat history"
+          onClick={onMobileClose}
+        />
+      ) : null}
+      <aside
+        className={cn(
+          "group/sidebar flex h-full min-h-0 flex-col border-border/60 bg-sidebar text-sidebar-foreground",
+          isMobile
+            ? cn(
+                "fixed inset-y-0 left-0 z-40 w-[min(280px,88vw)] border-r shadow-xl transition-transform duration-200 ease-out md:hidden",
+                mobileOpen
+                  ? "translate-x-0"
+                  : "-translate-x-full pointer-events-none"
+              )
+            : cn(
+                "shrink-0 border-r transition-[width] duration-200 ease-out",
+                showExpanded ? "w-[260px]" : "w-[52px] overflow-x-hidden"
+              )
+        )}
+        aria-label="Chat history"
+        aria-hidden={isMobile && !mobileOpen}
+        suppressHydrationWarning
+        onClick={() => menuOpenId && setMenuOpenId(null)}
+      >
+      <div
+        className={cn(
+          "flex shrink-0 flex-col gap-2 overflow-hidden p-2",
+          !showExpanded && "items-center"
+        )}
+      >
         <div
           className={cn(
-            "mt-auto flex shrink-0 flex-col border-t border-line/60 bg-card/95 backdrop-blur-sm",
-            !expanded && "items-center"
+            "flex w-full items-center overflow-hidden",
+            showExpanded ? "justify-between gap-1" : "flex-col"
           )}
         >
-          <div
-            className={cn(
-              expanded ? "p-2" : "flex flex-col items-center gap-1 px-1.5 pb-2 pt-1"
-            )}
-          >
-            {expanded ? (
-              <button
-                type="button"
-                onClick={onOpenProfile}
-                className="group/me flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-hidden"
-                aria-label="Edit health profile"
-                title="Edit health profile"
-              >
-                {user ? (
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground shadow-sm">
-                    {initials(user.name)}
-                  </span>
-                ) : (
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Sliders className="size-4" />
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium leading-tight">
-                    {user ? user.name : "Health profile"}
-                  </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {user
-                      ? profileSummary || "Personalizes guidance"
-                      : "Set age, conditions, allergies…"}
-                  </span>
-                </span>
-                <Sliders className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/me:text-foreground" />
-              </button>
+          <SidebarToggle
+            expanded={isMobile ? true : expanded}
+            onToggle={toggle}
+          />
+        </div>
+        <NewChatButton expanded={showExpanded} onNew={handleNew} />
+      </div>
+
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {showExpanded ? (
+          <div className="scrollbar-thin h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-2">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 px-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Loading…
+              </div>
+            ) : sessions.length === 0 ? (
+              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                No chats yet. Start with a new chat.
+              </p>
             ) : (
-              <button
-                type="button"
-                onClick={onOpenProfile}
-                aria-label="Edit health profile"
-                title="Health profile"
-                className="flex size-9 items-center justify-center rounded-xl border border-transparent bg-muted/25 transition-colors hover:border-line/50 hover:bg-muted/60 focus-visible:outline-hidden"
-              >
-                {user ? (
-                  <span className="flex size-7 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[10px] font-semibold text-primary-foreground shadow-sm">
-                    {initials(user.name)}
-                  </span>
-                ) : (
-                  <Sliders className="size-4 text-muted-foreground" />
-                )}
-              </button>
+              <div className="space-y-4">
+                {(Object.keys(GROUP_LABELS) as GroupKey[]).map((key) => {
+                  const group = grouped[key];
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={key}>
+                      <p className="mb-1 px-2 text-[11px] font-medium text-muted-foreground">
+                        {GROUP_LABELS[key]}
+                      </p>
+                      <ul className="space-y-0.5">{group.map(renderExpandedRow)}</ul>
+                    </div>
+                  );
+                })}
+                {onClearAll ? (
+                  <button
+                    type="button"
+                    className="mt-2 w-full px-2 py-1.5 text-left text-[11px] text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmClearAll(true)}
+                  >
+                    Clear all chats
+                  </button>
+                ) : null}
+              </div>
             )}
           </div>
+        ) : null}
+      </div>
+
+      {onOpenProfile ? (
+        <div className="shrink-0 border-t border-border/60 p-2">
+          <button
+            type="button"
+            onClick={handleOpenProfile}
+            className={cn(
+              "flex items-center rounded-lg transition-colors hover:bg-sidebar-accent",
+              showExpanded
+                ? "w-full gap-2.5 px-2 py-2"
+                : "mx-auto size-9 shrink-0 justify-center"
+            )}
+            aria-label="Health profile"
+            title={user ? user.name : "Health profile"}
+          >
+            {user ? (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-lavender text-[11px] font-semibold text-primary-foreground">
+                {initials(user.name)}
+              </span>
+            ) : (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-muted-foreground">
+                <UserRound className="size-4" />
+              </span>
+            )}
+            {showExpanded ? (
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block truncate text-sm font-medium leading-tight">
+                  {user ? user.name : "Health profile"}
+                </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {user
+                    ? profileSummary || "Personalizes guidance"
+                    : "Age, conditions, allergies…"}
+                </span>
+              </span>
+            ) : null}
+          </button>
         </div>
       ) : null}
+
+      <Modal open={confirmClearAll} onOpenChange={setConfirmClearAll}>
+        <div className="px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
+          <h2 className="font-heading text-base font-semibold">Clear all chats?</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Every conversation will be removed
+            {user ? " from this device and your account" : " from this device"}.
+            This cannot be undone.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line/60 px-5 py-3 sm:px-6">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmClearAll(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              setConfirmClearAll(false);
+              onClearAll?.();
+            }}
+          >
+            Clear all
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={pendingDelete != null}
@@ -441,12 +443,7 @@ export default function ChatHistorySidebar({
         }}
       >
         <div className="px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
-          <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
-            <Trash2 className="size-4" />
-          </div>
-          <h2 className="font-heading text-base font-semibold">
-            Delete this chat?
-          </h2>
+          <h2 className="font-heading text-base font-semibold">Delete this chat?</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground/90">
               {pendingDelete?.title ?? "This chat"}
@@ -455,7 +452,7 @@ export default function ChatHistorySidebar({
             {user ? " and your account" : ""}. This cannot be undone.
           </p>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-line/60 bg-muted/30 px-5 py-3 sm:px-6">
+        <div className="flex justify-end gap-2 border-t border-line/60 px-5 py-3 sm:px-6">
           <Button
             type="button"
             variant="ghost"
@@ -478,5 +475,6 @@ export default function ChatHistorySidebar({
         </div>
       </Modal>
     </aside>
+    </>
   );
 }

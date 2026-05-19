@@ -1,7 +1,12 @@
 "use client";
 
-import { ChatMessage, HealthDecisionResponse } from "@/lib/types";
+import { ChatMessage, ChatSession } from "@/lib/types";
+import {
+  decisionForMessage,
+  isFirstModelTurn,
+} from "@/lib/chat-messages";
 import DecisionMessage from "@/components/DecisionMessage";
+import MessageSpeakToolbar from "@/components/MessageSpeakToolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,9 +23,13 @@ import {
   Bot,
   Brain,
   HeartPulse,
+  AlertCircle,
   Loader2,
+  PanelLeftOpen,
   Send,
+  Sliders,
   Sparkles,
+  SquarePen,
   Stethoscope,
   Thermometer,
   User as UserIcon,
@@ -55,16 +64,18 @@ const STARTERS = [
 
 interface Props {
   messages: ChatMessage[];
+  activeSession?: ChatSession | null;
   onSend: (text: string) => void;
   loading?: boolean;
-  /**
-   * Decision for the most recent assistant message. When present, the
-   * trailing model message is rendered as a rich triage card instead of a
-   * plain text bubble. Older assistant messages (from earlier turns) keep
-   * their plain-text rendering — their per-turn decisions aren't retained
-   * by the current session schema.
-   */
-  decision?: HealthDecisionResponse | null;
+  profileIsDefault?: boolean;
+  onOpenProfile?: () => void;
+  sendError?: string | null;
+  onRetrySend?: () => void;
+  onDismissSendError?: () => void;
+  onRequestFreshGuidance?: () => void;
+  showMobileNav?: boolean;
+  onOpenSidebar?: () => void;
+  onNewChat?: () => void;
 }
 
 function Avatar({ role }: { role: ChatMessage["role"] }) {
@@ -84,28 +95,26 @@ function Avatar({ role }: { role: ChatMessage["role"] }) {
 
 export default function Chat({
   messages,
+  activeSession = null,
   onSend,
   loading,
-  decision,
+  profileIsDefault = false,
+  onOpenProfile,
+  sendError,
+  onRetrySend,
+  onDismissSendError,
+  onRequestFreshGuidance,
+  showMobileNav = false,
+  onOpenSidebar,
+  onNewChat,
 }: Props) {
-  // Find the last assistant message — only that one gets the rich card.
-  let lastModelIdx = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "model") {
-      lastModelIdx = i;
-      break;
-    }
-  }
-  const firstModelIdx = messages.findIndex((m) => m.role === "model");
-  const isFirstAssistantTurn =
-    lastModelIdx >= 0 && firstModelIdx === lastModelIdx;
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading, decision]);
+  }, [messages, loading, sendError]);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -136,6 +145,30 @@ export default function Chat({
   const isEmpty = messages.length === 0;
 
   const composer = (
+    <>
+      {sendError ? (
+        <div
+          role="alert"
+          className="mb-2 flex flex-col gap-2 rounded-xl border-2 border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex gap-2">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <p className="text-foreground/90">{sendError}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {onRetrySend ? (
+              <Button type="button" size="sm" variant="outline" onClick={onRetrySend}>
+                Try again
+              </Button>
+            ) : null}
+            {onDismissSendError ? (
+              <Button type="button" size="sm" variant="ghost" onClick={onDismissSendError}>
+                Dismiss
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     <form onSubmit={handleSubmit} className="mx-auto w-full max-w-2xl">
       <div className="group/composer flex items-end gap-2 rounded-2xl border border-line/70 bg-background p-1.5 shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/15">
         <Textarea
@@ -146,7 +179,7 @@ export default function Chat({
           disabled={loading}
           rows={1}
           placeholder="Describe your symptoms…"
-          className="min-h-9 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-sm leading-5 shadow-none outline-none focus-visible:ring-0"
+          className="min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2.5 text-base leading-5 shadow-none outline-none focus-visible:ring-0 sm:min-h-9 sm:text-sm"
           style={{ boxShadow: "none" }}
         />
         <Button
@@ -164,13 +197,40 @@ export default function Chat({
         </Button>
       </div>
     </form>
+    </>
   );
 
   return (
     <Card className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden border-line/70 bg-card/95">
+      {showMobileNav && onOpenSidebar ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-line/60 px-2 py-2 md:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 min-h-10 flex-1 gap-2"
+            onClick={onOpenSidebar}
+          >
+            <PanelLeftOpen className="size-4 shrink-0" />
+            Chats
+          </Button>
+          {onNewChat ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-10 min-h-10 shrink-0 gap-1.5 px-3"
+              onClick={onNewChat}
+            >
+              <SquarePen className="size-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">New</span>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {isEmpty ? (
-        /* Empty state — hero + starters + composer as one cohesive centered block */
-        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain px-5 py-6">
+        /* Empty state â€” hero + starters + composer as one cohesive centered block */
+        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-5 sm:py-6">
           <div className="w-full max-w-2xl space-y-6">
             <div className="animate-fade-up flex flex-col items-center text-center">
               <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary/20 to-mint/20 text-primary ring-1 ring-primary/20">
@@ -191,6 +251,21 @@ export default function Chat({
             >
               {composer}
             </div>
+
+            {profileIsDefault && onOpenProfile ? (
+              <div
+                className="flex flex-col items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-center sm:flex-row sm:text-left"
+                role="note"
+              >
+                <Sliders className="size-4 shrink-0 text-primary" />
+                <p className="flex-1 text-sm text-foreground/85">
+                  Add age, conditions, and allergies for more tailored guidance.
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={onOpenProfile}>
+                  Edit profile
+                </Button>
+              </div>
+            ) : null}
 
             <div
               className="animate-fade-up grid gap-2 sm:grid-cols-2"
@@ -228,16 +303,16 @@ export default function Chat({
         /* Conversation — only the message list scrolls; composer stays pinned */
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-5">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-5 sm:py-5">
               {messages.map((m, i) => {
                 const isUser = m.role === "user";
-                const showDecisionCard =
-                  !isUser && i === lastModelIdx && decision != null;
+                const msgDecision = decisionForMessage(m, activeSession);
+                const showDecisionCard = !isUser && msgDecision != null;
                 return (
                   <div
                     key={i}
                     className={cn(
-                      "animate-fade-up flex gap-3",
+                      "animate-fade-up flex gap-2 sm:gap-3",
                       isUser && "flex-row-reverse"
                     )}
                   >
@@ -245,20 +320,22 @@ export default function Chat({
                     {showDecisionCard ? (
                       <div className="min-w-0 flex-1">
                         <DecisionMessage
-                          decision={decision!}
-                          showLeadDisclaimer={isFirstAssistantTurn}
+                          decision={msgDecision}
+                          showLeadDisclaimer={isFirstModelTurn(messages, i)}
+                          onRequestFreshGuidance={onRequestFreshGuidance}
                         />
                       </div>
-                    ) : (
-                      <div
-                        className={cn(
-                          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-                          isUser
-                            ? "rounded-tr-sm bg-primary text-primary-foreground"
-                            : "rounded-tl-sm border border-line/60 bg-card"
-                        )}
-                      >
+                    ) : isUser ? (
+                      <div className="max-w-[min(100%,20rem)] rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm sm:max-w-[85%] sm:px-4">
                         {m.text}
+                      </div>
+                    ) : (
+                      <div className="flex max-w-[min(100%,20rem)] flex-col overflow-hidden rounded-2xl rounded-tl-sm border border-line/60 bg-card text-sm leading-relaxed shadow-sm sm:max-w-[85%]">
+                        <MessageSpeakToolbar
+                          text={m.text}
+                          className="bg-muted/20"
+                        />
+                        <p className="px-4 py-2.5">{m.text}</p>
                       </div>
                     )}
                   </div>
@@ -280,7 +357,7 @@ export default function Chat({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-line/60 bg-card/95 px-5 py-3 backdrop-blur-sm">
+          <div className="shrink-0 border-t border-line/60 bg-card/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-5">
             {composer}
           </div>
         </div>

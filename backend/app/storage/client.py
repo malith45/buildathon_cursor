@@ -8,6 +8,7 @@ import json
 import logging
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Iterable
 
 from google.api_core import exceptions as gapi_exceptions
@@ -122,6 +123,20 @@ def list_prefix(prefix: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Health / init.
 # ---------------------------------------------------------------------------
+
+
+def can_attempt_storage() -> bool:
+    """False when storage is configured but credentials are clearly missing."""
+    settings = get_settings()
+    if not settings.storage_configured:
+        return False
+    if settings.GCS_CREDENTIALS_JSON.strip():
+        return True
+    cred = settings.GOOGLE_APPLICATION_CREDENTIALS.strip()
+    if not cred:
+        return False
+    path = Path(os.path.expandvars(os.path.expanduser(cred)))
+    return path.is_file()
 
 
 def storage_ping() -> None:

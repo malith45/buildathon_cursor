@@ -3,7 +3,6 @@
 import sys
 
 from app.config import get_settings
-from app.services.openai_service import probe_openai
 from app.storage import client as storage_client
 
 
@@ -51,6 +50,13 @@ def log_startup_connections() -> tuple[bool, bool]:
         storage_ok = True
     elif not settings.storage_configured:
         _out("📦  Storage:  ⏭️   Not configured — set GCS_BUCKET in backend/.env")
+    elif not storage_client.can_attempt_storage():
+        endpoint = _storage_endpoint_label()
+        hint = storage_client.storage_health_hint()
+        _out(f"📦  Storage:  ❌  Credentials missing ({endpoint})")
+        if len(hint) > 140:
+            hint = hint[:137] + "..."
+        _out(f"     -> {hint}")
     else:
         endpoint = _storage_endpoint_label()
         try:
@@ -71,21 +77,11 @@ def log_startup_connections() -> tuple[bool, bool]:
         _out(
             "🤖  OpenAI:   ❌  Not configured — set OPENAI_API_KEY in backend/.env"
         )
-    elif not settings.OPENAI_PROBE_ON_STARTUP:
+    else:
         _out(
-            f"🤖  OpenAI:   🔑  API key set, model={settings.OPENAI_MODEL} (live probe skipped)"
+            f"🤖  OpenAI:   🔑  API key set, model={settings.OPENAI_MODEL}"
         )
         ai_ok = True
-    else:
-        result = probe_openai()
-        ai_ok = bool(result.get("working"))
-        if ai_ok:
-            model = result.get("model") or settings.OPENAI_MODEL
-            _out(f"🤖  OpenAI:   ✅  Connected ({model})")
-        else:
-            msg = str(result.get("message") or "Connection failed")
-            _out("🤖  OpenAI:   ❌  Not connected")
-            _out(f"     -> {msg[:160]}")
 
     _out(bar + "\n")
     return storage_ok, ai_ok

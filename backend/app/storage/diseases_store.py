@@ -10,6 +10,7 @@ performed in memory.
 import threading
 from typing import Any
 
+from app.config import get_settings
 from app.data.disease_names import DISEASE_CATEGORIES, DISEASE_NAMES
 from app.storage import client
 
@@ -33,6 +34,9 @@ def _load_catalog() -> list[dict[str, Any]]:
         return _cached_catalog
     with _cache_lock:
         if _cached_catalog is not None:
+            return _cached_catalog
+        if not get_settings().storage_configured:
+            _cached_catalog = _build_seed()
             return _cached_catalog
         data, _ = client.read_json(CATALOG_PATH)
         if isinstance(data, list) and len(data) >= _MIN_CATALOG_SIZE:

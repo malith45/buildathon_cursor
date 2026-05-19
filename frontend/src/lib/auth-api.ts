@@ -41,7 +41,8 @@ export async function signup(
     body: JSON.stringify({ email, password, name }),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json() as Promise<AuthResponse>;
+  const data = (await res.json()) as AuthResponse;
+  return { ...data, user: normalizeUser(data.user) };
 }
 
 export async function login(

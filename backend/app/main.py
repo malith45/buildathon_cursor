@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.rate_limit import decision_rate_limit_exceeded
 from app.routers import auth, chats, diseases, health
 from app.startup_checks import log_startup_connections
 from app.storage import client as storage_client
@@ -36,7 +37,7 @@ async def lifespan(_app: FastAPI):
     settings.validate_production_secrets()
     storage_ok, _ai_ok = log_startup_connections()
 
-    if settings.storage_configured and storage_ok:
+    if settings.storage_configured and storage_client.can_attempt_storage():
         try:
             storage_client.init_storage()
             logger.info("Storage layer ready.")
@@ -52,6 +53,18 @@ async def lifespan(_app: FastAPI):
                 exc.__class__.__name__,
                 hint,
             )
+    elif settings.storage_configured:
+        logger.warning(
+            "Storage skipped at startup: %s",
+            storage_client.storage_health_hint(),
+        )
+    try:
+        from app.storage import diseases_store
+
+        diseases_store.search_diseases("", limit=1)
+        logger.info("Disease catalog preloaded in memory.")
+    except Exception:
+        logger.warning("Disease catalog preload skipped.", exc_info=True)
     yield
 
 
@@ -63,9 +76,23 @@ app = FastAPI(
 
 settings = get_settings()
 
+@app.middleware("http")
+async def rate_limit_health_decision(request: Request, call_next):
+    if (
+        request.method == "POST"
+        and request.url.path.rstrip("/") == "/api/health/decision"
+    ):
+        blocked = decision_rate_limit_exceeded(request)
+        if blocked is not None:
+            return blocked
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list(),
+    # Netlify production + deploy-preview URLs without listing every preview ID.
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

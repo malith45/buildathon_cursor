@@ -18,6 +18,8 @@ export type MessageRole = "user" | "model";
 export interface ChatMessage {
   role: MessageRole;
   text: string;
+  /** Full triage payload for assistant turns (persisted in chat history). */
+  decision?: HealthDecisionResponse;
 }
 
 export interface EvidenceSnippet {

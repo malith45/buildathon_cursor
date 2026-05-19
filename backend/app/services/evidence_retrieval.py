@@ -1,4 +1,4 @@
-"""Lightweight retrieval: local disease catalog + links to MedlinePlus search (NIH)."""
+"""Lightweight retrieval: in-memory catalog + MedlinePlus link (no network I/O)."""
 
 from __future__ import annotations
 
@@ -16,84 +16,42 @@ def medlineplus_search_url(query: str) -> str:
     )
 
 
-def gather_evidence(user_messages_blob: str, limit: int = 4) -> list[EvidenceSnippet]:
-    """Match user wording to catalog names; always include at least one trusted portal."""
-    limit = max(1, min(limit, 8))
+def gather_evidence(user_messages_blob: str, limit: int = 2) -> list[EvidenceSnippet]:
+    """Fast path: one catalog scan + one NIH link (runs in parallel with OpenAI)."""
+    limit = max(1, min(limit, 4))
     blob = user_messages_blob.strip()
+    primary_q = blob[:80] if blob else "symptoms"
     snippets: list[EvidenceSnippet] = []
-    seen: set[str] = set()
-
-    # Query the catalog with a trimmed slice (avoid huge blobs)
-    primary_q = blob[:100] if blob else ""
 
     try:
-        rows = diseases_store.search_diseases(primary_q, limit=limit + 2)
+        rows = diseases_store.search_diseases(primary_q, limit=max(1, limit - 1))
     except Exception:
         rows = []
 
     for row in rows:
         name = str(row.get("name") or "").strip()
-        if not name or name.lower() in seen:
+        if not name:
             continue
-        seen.add(name.lower())
         cat = row.get("category")
-        cat_s = f" (category: {cat})" if cat else ""
+        cat_s = f" ({cat})" if cat else ""
         snippets.append(
             EvidenceSnippet(
                 title=name,
                 source="MediAssist educational condition index",
                 snippet=(
-                    f"Matched your message to this non-diagnostic catalog label{cat_s}. "
-                    "Use it only for general reading — it is not a diagnosis or treatment plan."
+                    f"Matched your message to this catalog label{cat_s}. "
+                    "For general reading only — not a diagnosis."
                 ),
                 url=medlineplus_search_url(name),
             )
         )
-        if len(snippets) >= limit - 1:
-            break
 
-    # If catalog search weak, try meaningful tokens from user text
-    if len(snippets) < 2 and blob:
-        try:
-            for token in blob.replace(",", " ").split():
-                tok = token.strip(".,?!'\"")
-                if len(tok) < 4:
-                    continue
-                for row in diseases_store.search_diseases(tok, limit=3):
-                    name = str(row.get("name") or "").strip()
-                    if not name or name.lower() in seen:
-                        continue
-                    seen.add(name.lower())
-                    cat = row.get("category")
-                    cat_s = f" (category: {cat})" if cat else ""
-                    snippets.append(
-                        EvidenceSnippet(
-                            title=name,
-                            source="MediAssist educational condition index",
-                            snippet=(
-                                f"Related catalog entry{cat_s} for orientation only — "
-                                "does not confirm you have this condition."
-                            ),
-                            url=medlineplus_search_url(name),
-                        )
-                    )
-                    if len(snippets) >= limit - 1:
-                        break
-                if len(snippets) >= limit - 1:
-                    break
-        except Exception:
-            pass
-
-    core = snippets[: max(0, limit - 1)]
-
-    nih = EvidenceSnippet(
-        title="MedlinePlus — topic search",
-        source="U.S. National Library of Medicine (NIH)",
-        snippet=(
-            "Clinician-reviewed overviews and symptom topics. "
-            "Use alongside — not instead of — advice from your own healthcare professional."
-        ),
-        url=medlineplus_search_url(primary_q or "health symptoms"),
+    snippets.append(
+        EvidenceSnippet(
+            title="MedlinePlus — topic search",
+            source="U.S. National Library of Medicine (NIH)",
+            snippet="Clinician-reviewed health topics from NIH.",
+            url=medlineplus_search_url(primary_q),
+        )
     )
-    out = core + [nih]
-    return out[:limit]
+    return snippets[:limit]

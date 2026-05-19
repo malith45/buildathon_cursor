@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRedirectIfAuthenticated } from "@/hooks/useRedirectIfAuthenticated";
 import { useStripSensitiveQueryParams } from "@/hooks/useStripSensitiveQueryParams";
 import { authRedirect } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const BAR_BG: Record<StrengthInfo["score"], string> = {
 
 export default function SignupForm() {
   const { signup } = useAuth();
+  useRedirectIfAuthenticated("/profile");
   useStripSensitiveQueryParams();
   const nameRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);

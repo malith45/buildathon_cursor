@@ -1,10 +1,10 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from app.config import assert_openai_key, get_settings
 from app.schemas.health import DecisionRequest, HealthDecisionResponse
-from app.services import health_decision_service, openai_service
+from app.services import health_decision_service
 from app.storage import client as storage_client
 from app.storage import diseases_store
 from app.storage.errors import is_storage_unavailable
@@ -20,11 +20,10 @@ def _storage_status() -> tuple[bool, bool, str | None]:
         return False, False, "Storage disabled (STORAGE_ENABLED=false)"
     if not settings.storage_configured:
         return False, False, "Set GCS_BUCKET in backend/.env"
-    try:
-        storage_client.storage_ping()
-        return True, True, None
-    except Exception as exc:
-        return True, False, str(exc)[:200]
+    if not storage_client.can_attempt_storage():
+        return True, False, storage_client.storage_health_hint()[:200]
+    # Avoid blocking page loads on a live GCS list; catalog uses in-memory seed when needed.
+    return True, False, "Storage configured (connectivity not probed on this endpoint)"
 
 
 @router.post("/init-storage")
@@ -57,13 +56,11 @@ def post_init_storage() -> dict:
 
 
 @router.get("")
-def health_check(
-    probe: bool = Query(False, description="Run a live OpenAI API test"),
-) -> dict:
+def health_check() -> dict:
     settings = get_settings()
     storage_configured, storage_connected, storage_message = _storage_status()
     diseases_ready = storage_connected and diseases_store.catalog_ready()
-    payload: dict = {
+    return {
         "status": "ok",
         "aiConfigured": bool(settings.OPENAI_API_KEY.strip()),
         "aiModel": settings.OPENAI_MODEL,
@@ -77,17 +74,6 @@ def health_check(
         ),
         "diseasesReady": diseases_ready,
     }
-    if probe:
-        try:
-            payload["ai"] = openai_service.probe_openai()
-        except Exception as exc:
-            payload["ai"] = {
-                "configured": bool(settings.OPENAI_API_KEY.strip()),
-                "working": False,
-                "message": str(exc)[:200],
-                "model": None,
-            }
-    return payload
 
 
 @router.post("/decision", response_model=HealthDecisionResponse)

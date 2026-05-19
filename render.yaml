@@ -1,5 +1,4 @@
-# MediAssist API — deploy at https://dashboard.render.com (Blueprint / New Blueprint)
-# After deploy, set CORS_ORIGINS to your Netlify URL in the Render dashboard.
+# MediAssist API — https://dashboard.render.com → New → Blueprint
 services:
   - type: web
     name: mediassist-api
@@ -14,8 +13,6 @@ services:
         value: "3.11.9"
       - key: APP_ENV
         value: production
-      - key: PORT
-        value: "10000"
       - key: OPENAI_API_KEY
         sync: false
       - key: AUTH_SECRET
@@ -28,5 +25,9 @@ services:
         sync: false
       - key: GCS_PROJECT
         sync: false
+      # Option A: paste full service-account JSON (recommended on Render)
+      - key: GCS_CREDENTIALS_JSON
+        sync: false
+      # Option B: secret file mount path (see DEPLOY.md)
       - key: GOOGLE_APPLICATION_CREDENTIALS
         sync: false

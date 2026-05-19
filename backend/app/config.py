@@ -1,4 +1,6 @@
+import json
 import os
+import tempfile
 from pathlib import Path
 from functools import lru_cache
 
@@ -17,12 +19,19 @@ class Settings(BaseSettings):
     # gpt-4o-mini is the cheap default (~$0.0004/triage call).
     # Override to gpt-4o / gpt-4.1-mini if you want stronger reasoning.
     OPENAI_MODEL: str = "gpt-4o-mini"
-    # Retries inside health_decision_service on non-quota failures.
-    OPENAI_DECISION_RETRIES: int = 1
-    # Live API probe on backend boot (small request, costs ~$0.00002).
-    OPENAI_PROBE_ON_STARTUP: bool = False
+    # Retries inside health_decision_service on non-quota failures (0 = one attempt only).
+    OPENAI_DECISION_RETRIES: int = 0
     # Hard request timeout for OpenAI calls (seconds).
-    OPENAI_TIMEOUT: float = 30.0
+    OPENAI_TIMEOUT: float = 20.0
+    # Cap model output size for faster completions.
+    OPENAI_MAX_OUTPUT_TOKENS: int = 700
+    # Only the last N chat turns are sent to the model (keeps latency stable).
+    OPENAI_MAX_CONTEXT_MESSAGES: int = 10
+    # Evidence snippets (set false to skip retrieval entirely).
+    EVIDENCE_ENABLED: bool = True
+    EVIDENCE_MAX_SNIPPETS: int = 2
+    # Max POST /api/health/decision calls per client IP per minute.
+    DECISION_RATE_LIMIT_PER_MINUTE: int = 30
 
     # ---------- Auth / server ----------
     AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
@@ -45,6 +54,8 @@ class Settings(BaseSettings):
     # GOOGLE_APPLICATION_CREDENTIALS env var so google-cloud-storage picks it up.
     # Leave blank to fall back to Application Default Credentials (ADC).
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
+    # Render/Railway: paste the full service-account JSON here (easier than secret files).
+    GCS_CREDENTIALS_JSON: str = ""
 
     @property
     def storage_configured(self) -> bool:
@@ -79,24 +90,40 @@ class Settings(BaseSettings):
             )
 
 
+def _materialize_gcs_credentials(settings: Settings) -> None:
+    """Set GOOGLE_APPLICATION_CREDENTIALS for google-cloud-storage."""
+    json_blob = settings.GCS_CREDENTIALS_JSON.strip()
+    if json_blob:
+        # Accept raw JSON or a path to a JSON file (some hosts mount secrets as paths).
+        if json_blob.startswith("{"):
+            payload = json.loads(json_blob)
+        else:
+            path = Path(os.path.expandvars(os.path.expanduser(json_blob.strip("\"'"))))
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="gcs-sa-")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp_path
+        settings.GOOGLE_APPLICATION_CREDENTIALS = tmp_path
+        return
+
+    cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS.strip().strip("\"'")
+    if not cred_path:
+        return
+    normalized = os.path.expandvars(os.path.expanduser(cred_path))
+    try:
+        normalized = str(Path(normalized).resolve())
+    except Exception:
+        pass
+    if Path(normalized).is_file():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = normalized
+        settings.GOOGLE_APPLICATION_CREDENTIALS = normalized
+
+
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
-    # google-cloud-storage reads GOOGLE_APPLICATION_CREDENTIALS from os.environ,
-    # not from pydantic settings. Propagate it once at load time.
-    cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS.strip().strip("\"'")
-    if cred_path:
-        # Normalize user-supplied path formats from .env:
-        # - optional wrapping quotes
-        # - ~/ and %VARS%
-        normalized = os.path.expandvars(os.path.expanduser(cred_path))
-        try:
-            normalized = str(Path(normalized).resolve())
-        except Exception:
-            # Keep the expanded path even if resolve fails.
-            pass
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = normalized
-        settings.GOOGLE_APPLICATION_CREDENTIALS = normalized
+    _materialize_gcs_credentials(settings)
     return settings
 
 

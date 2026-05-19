@@ -43,7 +43,7 @@ export function Modal({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center px-4 transition-opacity duration-200",
+        "fixed inset-0 z-[100] flex items-center justify-center px-4 transition-opacity duration-200",
         open ? "opacity-100" : "pointer-events-none opacity-0"
       )}
       aria-hidden={!open}

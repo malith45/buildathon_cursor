@@ -17,10 +17,14 @@ Commit and push this repo. Do **not** commit `backend/.env`, GCS JSON keys, or s
    | `OPENAI_API_KEY` | Your OpenAI key |
    | `GCS_BUCKET` | Your bucket name (no `gs://`) |
    | `GCS_PROJECT` | GCP project ID (optional) |
-   | `GOOGLE_APPLICATION_CREDENTIALS` | Path to mounted secret file (see below) |
-   | `CORS_ORIGINS` | Your Netlify URL after step 3, e.g. `https://mediassist.netlify.app` |
+   | `GCS_CREDENTIALS_JSON` | **Recommended:** entire service-account JSON pasted as one env var |
+   | `CORS_ORIGINS` | Optional — Netlify `*.netlify.app` is allowed automatically |
 
-4. **GCS credentials on Render:** Service → **Environment** → **Secret Files** → mount your service-account JSON (e.g. `/etc/secrets/gcs-key.json`) → set `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/gcs-key.json`.
+4. **GCS credentials on Render (pick one):**
+
+   **Option A — env var (easiest):** In **Environment**, add `GCS_CREDENTIALS_JSON` and paste the **full** contents of your downloaded `*.json` key (starts with `{"type":"service_account",...}`). Leave `GOOGLE_APPLICATION_CREDENTIALS` empty.
+
+   **Option B — secret file:** **Secret Files** → upload JSON → set `GOOGLE_APPLICATION_CREDENTIALS` to the mount path Render shows (e.g. `/etc/secrets/gcs-key.json`).
 
 5. Deploy and copy the API URL, e.g. `https://mediassist-api.onrender.com`.
 
@@ -60,7 +64,9 @@ Commit and push this repo. Do **not** commit `backend/.env`, GCS JSON keys, or s
 | Symptom | Fix |
 |---------|-----|
 | Network error / failed to fetch | Wrong `NEXT_PUBLIC_API_URL` or API asleep (Render free tier cold start ~30s). |
-| CORS error in browser console | Add exact Netlify origin to `CORS_ORIGINS` on Render. |
+| CORS error in browser console | Redeploy API (allows `*.netlify.app`); optionally set `CORS_ORIGINS` too. |
+| Render deploy crash on start | Set `OPENAI_API_KEY`, `AUTH_SECRET` (auto), and `GCS_CREDENTIALS_JSON` or fix GCS. |
+| Triage works locally, not deployed | `NEXT_PUBLIC_API_URL` must be Render URL; wait ~30s for free tier cold start. |
 | Auth / chats 503 | `STORAGE_ENABLED=true` and GCS credentials on Render. |
 | Build fails on Netlify | Ensure `frontend/package.json` has no `file:..` parent dependency (removed in this repo). |
 

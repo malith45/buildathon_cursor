@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from app.prompts.system_prompt import SYSTEM_PROMPT
@@ -18,6 +19,8 @@ URGENCY_VALUES: set[str] = {
     "urgent_care",
     "emergency",
 }
+
+_EVIDENCE_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="evidence")
 
 FALLBACK_DECISION = HealthDecisionResponse(
     urgency="see_doctor_soon",
@@ -44,9 +47,17 @@ FALLBACK_DECISION = HealthDecisionResponse(
 )
 
 
+def _trim_messages(messages: list[ChatMessage]) -> list[ChatMessage]:
+    cap = max(2, get_settings().OPENAI_MAX_CONTEXT_MESSAGES)
+    if len(messages) <= cap:
+        return messages
+    return messages[-cap:]
+
+
 def _build_user_content(profile: HealthProfile, messages: list[ChatMessage]) -> str:
+    trimmed = _trim_messages(messages)
     history = "\n".join(
-        f"{'User' if m.role == 'user' else 'Assistant'}: {m.text}" for m in messages
+        f"{'User' if m.role == 'user' else 'Assistant'}: {m.text}" for m in trimmed
     )
     conditions = ", ".join(profile.conditions) if profile.conditions else "none listed"
     allergies = ", ".join(profile.allergies) if profile.allergies else "none listed"
@@ -130,13 +141,21 @@ def _merge_escalation(
     )
 
 
-def _finalize_decision(
+def _attach_evidence(
     decision: HealthDecisionResponse,
     esc: emergency_escalation.EscalationResult,
-    user_blob: str,
+    evidence_future,
 ) -> HealthDecisionResponse:
     merged = _merge_escalation(decision, esc)
-    snippets = evidence_retrieval.gather_evidence(user_blob)
+    settings = get_settings()
+    if not settings.EVIDENCE_ENABLED:
+        return merged
+    try:
+        snippets = evidence_future.result(timeout=3.0)
+    except Exception:
+        snippets = evidence_retrieval.gather_evidence(
+            "", limit=max(1, settings.EVIDENCE_MAX_SNIPPETS)
+        )
     return merged.model_copy(update={"evidenceSnippets": snippets})
 
 
@@ -146,19 +165,24 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
     user_content = _build_user_content(profile, messages)
 
     settings = get_settings()
-    retries = max(1, settings.OPENAI_DECISION_RETRIES)
+    attempts = 1 + max(0, settings.OPENAI_DECISION_RETRIES)
     last_error: Exception | None = None
 
-    for _attempt in range(retries):
+    evidence_future = _EVIDENCE_POOL.submit(
+        evidence_retrieval.gather_evidence,
+        user_blob,
+        max(1, settings.EVIDENCE_MAX_SNIPPETS),
+    )
+
+    for _attempt in range(attempts):
         try:
             raw = openai_service.generate_json(SYSTEM_PROMPT, user_content)
             decision = _parse_decision(raw)
             if decision:
-                return _finalize_decision(decision, esc, user_blob)
+                return _attach_evidence(decision, esc, evidence_future)
             last_error = ValueError("Could not parse model JSON")
         except Exception as exc:
             last_error = exc
-            # Stop immediately on quota errors — retrying just burns more budget.
             if openai_service.is_quota_error(exc):
                 break
             continue
@@ -170,4 +194,4 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
             "safety response. Check your usage at "
             "https://platform.openai.com/usage and retry shortly."
         )
-    return _finalize_decision(fallback, esc, user_blob)
+    return _attach_evidence(fallback, esc, evidence_future)

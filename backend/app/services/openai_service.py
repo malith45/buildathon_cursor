@@ -67,7 +67,8 @@ def generate_json(system_instruction: str, user_content: str) -> str:
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            temperature=0.3,
+            temperature=0.2,
+            max_tokens=max(256, settings.OPENAI_MAX_OUTPUT_TOKENS),
         )
     except RateLimitError as exc:
         raise OpenAIQuotaError(
