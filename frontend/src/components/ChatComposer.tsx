@@ -3,7 +3,7 @@
 import { FormEvent, KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Loader2, Send } from "lucide-react";
+import { AlertCircle, Loader2, Send, Square } from "lucide-react";
 
 interface Props {
   loading?: boolean;
@@ -11,6 +11,7 @@ interface Props {
   onSend: (text: string) => void;
   onRetrySend?: () => void;
   onDismissSendError?: () => void;
+  onCancel?: () => void;
   disabled?: boolean;
 }
 
@@ -20,6 +21,7 @@ export default function ChatComposer({
   onSend,
   onRetrySend,
   onDismissSendError,
+  onCancel,
   disabled,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -90,19 +92,32 @@ export default function ChatComposer({
             className="min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2.5 text-base leading-5 shadow-none outline-none focus-visible:ring-0 sm:min-h-9 sm:text-sm"
             style={{ boxShadow: "none" }}
           />
-          <Button
-            type="submit"
-            disabled={loading || disabled || !value.trim()}
-            size="icon-lg"
-            className="size-9 shrink-0 rounded-xl shadow-sm"
-            aria-label="Send"
-          >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </Button>
+          {loading && onCancel ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              className="size-9 shrink-0 rounded-xl"
+              aria-label="Stop generating"
+              onClick={onCancel}
+            >
+              <Square className="size-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={loading || disabled || !value.trim()}
+              size="icon-lg"
+              className="size-9 shrink-0 rounded-xl shadow-sm"
+              aria-label="Send"
+            >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+            </Button>
+          )}
         </div>
       </form>
     </>

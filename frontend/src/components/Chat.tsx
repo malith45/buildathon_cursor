@@ -1,5 +1,6 @@
 "use client";
 
+import { DecisionPartial } from "@/lib/decision-api";
 import { ChatMessage, ChatSession } from "@/lib/types";
 import ChatComposer from "@/components/ChatComposer";
 import ChatMessageList from "@/components/ChatMessageList";
@@ -55,6 +56,9 @@ interface Props {
   onRetrySend?: () => void;
   onDismissSendError?: () => void;
   onRequestFreshGuidance?: () => void;
+  onCancel?: () => void;
+  streamPartial?: DecisionPartial | null;
+  streamStage?: string;
   showMobileNav?: boolean;
   onOpenSidebar?: () => void;
   onNewChat?: () => void;
@@ -72,6 +76,9 @@ export default function Chat({
   onRetrySend,
   onDismissSendError,
   onRequestFreshGuidance,
+  onCancel,
+  streamPartial = null,
+  streamStage,
   showMobileNav = false,
   onOpenSidebar,
   onNewChat,
@@ -86,6 +93,7 @@ export default function Chat({
       onSend={onSend}
       onRetrySend={onRetrySend}
       onDismissSendError={onDismissSendError}
+      onCancel={loading ? onCancel : undefined}
       disabled={disabled}
     />
   );
@@ -195,6 +203,8 @@ export default function Chat({
               messages={messages}
               activeSession={activeSession}
               loading={loading}
+              streamPartial={streamPartial}
+              streamStage={streamStage}
               onRequestFreshGuidance={onRequestFreshGuidance}
             />
           </div>

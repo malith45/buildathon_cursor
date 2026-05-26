@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeNavigate } from "@/lib/navigation";
+import { markProfileFromHeader } from "@/lib/profile-nav";
+import { dispatchOpenProfileDrawer } from "@/lib/ui-events";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/lib/toast";
@@ -49,14 +51,25 @@ export default function AppHeader() {
             <ThemeToggle />
             {user ? (
               <>
-                <Link
-                  href="/profile"
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   title="Account & profile"
+                  aria-label="Account and profile"
+                  onClick={() => {
+                    if (pathname === "/") {
+                      dispatchOpenProfileDrawer();
+                      return;
+                    }
+                    if (pathname === "/profile") return;
+                    markProfileFromHeader();
+                    navigate("/profile");
+                  }}
                 >
                   <User className="size-3.5" />
                   <span className="hidden sm:inline">Account</span>
-                </Link>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

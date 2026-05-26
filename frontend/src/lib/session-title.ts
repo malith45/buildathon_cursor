@@ -2,6 +2,11 @@ import type { ChatSession } from "./types";
 
 const MAX_TITLE_LEN = 42;
 
+function capitalizeFirst(text: string): string {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** Strip filler openers so the sidebar shows the symptom topic, not the full prompt. */
 function stripLeadIns(text: string): string {
   let t = text.trim();
@@ -37,7 +42,7 @@ export function summarizeChatTitle(raw: string): string {
   let topic = stripLeadIns(firstClause(normalized));
   if (!topic) topic = normalized;
 
-  if (topic.length <= MAX_TITLE_LEN) return topic;
+  if (topic.length <= MAX_TITLE_LEN) return capitalizeFirst(topic);
 
   const slice = topic.slice(0, MAX_TITLE_LEN);
   const lastSpace = slice.lastIndexOf(" ");
@@ -46,7 +51,7 @@ export function summarizeChatTitle(raw: string): string {
       ? slice.slice(0, lastSpace)
       : slice.trimEnd();
 
-  return `${cut}…`;
+  return capitalizeFirst(`${cut}…`);
 }
 
 /** Prefer first user message over stored title (fixes legacy truncated titles). */

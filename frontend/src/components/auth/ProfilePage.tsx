@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSafeNavigate } from "@/lib/navigation";
+import { consumeProfileFromHeader } from "@/lib/profile-nav";
 import { type HealthProfile, type User } from "@/lib/types";
 import { errorMessage, toast } from "@/lib/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 
 function ProfileForm({
   user,
@@ -32,12 +33,17 @@ function ProfileForm({
   updateHealthProfile: (profile: HealthProfile) => Promise<void>;
 }) {
   const navigate = useSafeNavigate();
+  const [fromHeader, setFromHeader] = useState(false);
   const [name, setName] = useState(user.name);
   const [healthProfile, setHealthProfile] = useState<HealthProfile>(
     user.healthProfile
   );
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    setFromHeader(consumeProfileFromHeader());
+  }, []);
 
   async function handleSave() {
     setSaving(true);
@@ -68,6 +74,18 @@ function ProfileForm({
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8 sm:px-6">
+      {fromHeader ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-2 gap-1.5 text-muted-foreground"
+          onClick={() => navigate("/")}
+        >
+          <ArrowLeft className="size-4" />
+          Back to chat
+        </Button>
+      ) : null}
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight">
           Your profile

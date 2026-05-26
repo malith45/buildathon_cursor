@@ -1,6 +1,8 @@
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.config import assert_openai_key, get_settings
 from app.schemas.health import DecisionRequest, HealthDecisionResponse
@@ -98,6 +100,38 @@ def health_check(probe: bool = Query(False)) -> dict:
     if probe:
         payload["openai"] = openai_service.probe_openai()
     return payload
+
+
+@router.post("/decision/stream")
+def post_decision_stream(body: DecisionRequest) -> StreamingResponse:
+    try:
+        assert_openai_key()
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    def event_generator():
+        try:
+            for event in health_decision_service.decide_stream(
+                body.profile, body.messages
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except DecisionInfraError as exc:
+            payload = {"type": "error", "status": 503, "message": str(exc)}
+            yield f"data: {json.dumps(payload)}\n\n"
+        except Exception:
+            logger.exception("Unexpected error in POST /api/health/decision/stream")
+            payload = {
+                "type": "error",
+                "status": 500,
+                "message": "An unexpected error occurred.",
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/decision", response_model=HealthDecisionResponse)

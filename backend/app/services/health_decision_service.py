@@ -1,4 +1,6 @@
 import json
+import re
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -185,6 +187,80 @@ def _attach_evidence(
             "", limit=max(1, settings.EVIDENCE_MAX_SNIPPETS)
         )
     return merged.model_copy(update={"evidenceSnippets": snippets})
+
+
+def _extract_partial_from_buffer(buffer: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    urgency_match = re.search(r'"urgency"\s*:\s*"([^"]+)"', buffer)
+    if urgency_match and urgency_match.group(1) in URGENCY_VALUES:
+        out["urgency"] = urgency_match.group(1)
+    summary_match = re.search(
+        r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"(?:\s*[,}])',
+        buffer,
+    )
+    if summary_match:
+        try:
+            out["summary"] = json.loads(f'"{summary_match.group(1)}"')
+        except json.JSONDecodeError:
+            out["summary"] = summary_match.group(1).replace("\\n", "\n")
+    else:
+        open_match = re.search(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)', buffer)
+        if open_match and len(open_match.group(1)) >= 12:
+            out["summary"] = open_match.group(1).replace("\\n", "\n")
+    return out
+
+
+def decide_stream(
+    profile: HealthProfile, messages: list[ChatMessage]
+) -> Iterator[dict[str, Any]]:
+    """Yield SSE-friendly events: stage, partial, complete."""
+    user_blob = " ".join(m.text for m in messages if m.role == "user")
+    esc = emergency_escalation.detect_escalation(user_blob)
+    user_content = _build_user_content(profile, messages)
+
+    yield {"type": "stage", "stage": "analyzing"}
+
+    settings = get_settings()
+    attempts = 1 + max(0, settings.OPENAI_DECISION_RETRIES)
+    last_error: Exception | None = None
+
+    evidence_future = _EVIDENCE_POOL.submit(
+        evidence_retrieval.gather_evidence,
+        user_blob,
+        max(1, settings.EVIDENCE_MAX_SNIPPETS),
+    )
+
+    last_partial_key = ""
+
+    for _attempt in range(attempts):
+        try:
+            buffer = ""
+            for delta in openai_service.stream_json(SYSTEM_PROMPT, user_content):
+                buffer += delta
+                partial = _extract_partial_from_buffer(buffer)
+                key = json.dumps(partial, sort_keys=True)
+                if partial and key != last_partial_key:
+                    last_partial_key = key
+                    yield {"type": "partial", **partial}
+            decision = _parse_decision(buffer)
+            if decision:
+                final = _attach_evidence(decision, esc, evidence_future)
+                yield {"type": "complete", "decision": final.model_dump()}
+                return
+            last_error = ValueError("Could not parse model JSON")
+        except Exception as exc:
+            last_error = exc
+            if openai_service.is_quota_error(exc):
+                _raise_if_infra(exc)
+            if isinstance(exc, RuntimeError):
+                _raise_if_infra(exc)
+            continue
+
+    if last_error:
+        _raise_if_infra(last_error)
+
+    fallback = _attach_evidence(FALLBACK_DECISION.model_copy(), esc, evidence_future)
+    yield {"type": "complete", "decision": fallback.model_dump()}
 
 
 def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisionResponse:

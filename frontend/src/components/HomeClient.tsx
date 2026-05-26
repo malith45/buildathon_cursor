@@ -5,7 +5,14 @@ import { useIsMobile } from "@/lib/use-media-query";
 import Chat from "@/components/Chat";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ProfileDrawer from "@/components/ProfileDrawer";
-import { postHealthDecision } from "@/lib/apiClient";
+import {
+  DecisionAbortedError,
+  formatDecisionError,
+  formatFallbackNotice,
+  postHealthDecisionStream,
+  type DecisionPartial,
+} from "@/lib/apiClient";
+import { OPEN_PROFILE_DRAWER_EVENT } from "@/lib/ui-events";
 import {
   hydrateAllSessions,
   hydrateSessionDecisions,
@@ -62,6 +69,12 @@ export default function HomeClient() {
   const userId = user?.id ?? null;
   const isMobile = useIsMobile();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [streamPartial, setStreamPartial] = useState<DecisionPartial | null>(
+    null
+  );
+  const [streamStage, setStreamStage] = useState<string | undefined>();
+  const abortRef = useRef<AbortController | null>(null);
+  const cloudSyncWarnedRef = useRef(false);
 
   useEffect(() => {
     if (!isMobile) setMobileSidebarOpen(false);
@@ -75,6 +88,32 @@ export default function HomeClient() {
       document.body.style.overflow = prev;
     };
   }, [isMobile, mobileSidebarOpen]);
+
+  useEffect(() => {
+    const onOpenDrawer = () => setProfileOpen(true);
+    window.addEventListener(OPEN_PROFILE_DRAWER_EVENT, onOpenDrawer);
+    return () =>
+      window.removeEventListener(OPEN_PROFILE_DRAWER_EVENT, onOpenDrawer);
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (profileOpen) {
+        setProfileOpen(false);
+        return;
+      }
+      if (mobileSidebarOpen) setMobileSidebarOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [profileOpen, mobileSidebarOpen]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -220,13 +259,16 @@ export default function HomeClient() {
         setSessions(saved);
         saveSessions(saved, userId);
       } catch (err) {
-        toast.warning(
-          "Chat not saved online",
-          errorMessage(
-            err,
-            "Saved on this device only. Sign in and check cloud storage settings if you need sync."
-          )
-        );
+        if (!cloudSyncWarnedRef.current) {
+          cloudSyncWarnedRef.current = true;
+          toast.warning(
+            "Chat not saved online",
+            errorMessage(
+              err,
+              "Saved on this device only. Sign in and check cloud storage settings if you need sync."
+            )
+          );
+        }
       }
     },
     [userId]
@@ -244,10 +286,13 @@ export default function HomeClient() {
           return merged;
         });
       } catch (err) {
-        toast.warning(
-          "Chat not saved online",
-          errorMessage(err, "Saved on this device only.")
-        );
+        if (!cloudSyncWarnedRef.current) {
+          cloudSyncWarnedRef.current = true;
+          toast.warning(
+            "Chat not saved online",
+            errorMessage(err, "Saved on this device only.")
+          );
+        }
       }
     },
     [userId]
@@ -305,12 +350,26 @@ export default function HomeClient() {
     [sessions, activeId, persistSessions]
   );
 
+  const handleCancelSend = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreamPartial(null);
+    setStreamStage(undefined);
+    setLoading(false);
+  }, []);
+
   const runDecision = useCallback(
     async (
       session: ChatSession,
       transcript: ChatMessage[],
       options?: { appendUserText?: string }
     ) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStreamPartial(null);
+      setStreamStage(undefined);
+
       const apiMessages =
         options?.appendUserText != null
           ? messagesForApi([
@@ -319,10 +378,15 @@ export default function HomeClient() {
             ])
           : messagesForApi(transcript);
 
-      const result = await postHealthDecision({
-        profile,
-        messages: apiMessages,
-      });
+      const result = await postHealthDecisionStream(
+        { profile, messages: apiMessages },
+        {
+          signal: controller.signal,
+          onStage: (stage) => setStreamStage(stage),
+          onPartial: (partial) =>
+            setStreamPartial((prev) => ({ ...prev, ...partial })),
+        }
+      );
 
       const baseMessages =
         options?.appendUserText != null
@@ -335,18 +399,19 @@ export default function HomeClient() {
         result
       );
       setMessages(withReply);
+      setStreamPartial(null);
+      setStreamStage(undefined);
 
       const updated = updateSessionMessages(session, withReply, result);
       const merged = upsertSession(sessions, updated);
       persistSessionsLocal(merged);
       retryTextRef.current = null;
-      if (result.fallback) {
-        toast.warning(
-          "Limited AI response",
-          "Using safe fallback guidance. Tap Try again or check OPENAI_API_KEY on the API server."
-        );
+      const fallbackNotice = formatFallbackNotice(result);
+      if (fallbackNotice.show) {
+        toast.warning(fallbackNotice.title, fallbackNotice.message);
       }
       scheduleCloudSync(updated);
+      abortRef.current = null;
       return withReply;
     },
     [profile, sessions, persistSessionsLocal, scheduleCloudSync]
@@ -372,15 +437,18 @@ export default function HomeClient() {
       try {
         await runDecision(session, messages, { appendUserText: text });
       } catch (err) {
+        if (err instanceof DecisionAbortedError) {
+          return;
+        }
         setMessages(messages);
-        const msg = errorMessage(
-          err,
-          "Failed to reach the backend. Is it running on port 4000?"
-        );
-        setSendError(msg);
-        toast.error("Could not get guidance", msg);
+        const { title, message } = formatDecisionError(err);
+        setSendError(message);
+        toast.error(title, message);
       } finally {
         setLoading(false);
+        setStreamPartial(null);
+        setStreamStage(undefined);
+        abortRef.current = null;
       }
     },
     [
@@ -414,12 +482,16 @@ export default function HomeClient() {
     try {
       await runDecision(activeSession, trimmed);
     } catch (err) {
+      if (err instanceof DecisionAbortedError) return;
       setMessages(messages);
-      const msg = errorMessage(err, "Could not refresh guidance.");
-      setSendError(msg);
-      toast.error("Could not refresh guidance", msg);
+      const { title, message } = formatDecisionError(err);
+      setSendError(message);
+      toast.error(title, message);
     } finally {
       setLoading(false);
+      setStreamPartial(null);
+      setStreamStage(undefined);
+      abortRef.current = null;
     }
   }, [
     activeSession,
@@ -496,6 +568,9 @@ export default function HomeClient() {
             onRetrySend={handleRetrySend}
             onDismissSendError={() => setSendError(null)}
             onRequestFreshGuidance={() => void handleRequestFreshGuidance()}
+            onCancel={handleCancelSend}
+            streamPartial={streamPartial}
+            streamStage={streamStage}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
             onNewChat={startNewSession}
             showMobileNav={isMobile}

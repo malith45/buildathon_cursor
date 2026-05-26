@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import HealthProfileForm from "@/components/HealthProfileForm";
 import { HealthProfile } from "@/lib/types";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useSafeNavigate } from "@/lib/navigation";
+import { markProfileFromHeader } from "@/lib/profile-nav";
 import { Button } from "@/components/ui/button";
 import { Sliders, X } from "lucide-react";
 
@@ -19,6 +22,10 @@ export default function ProfileDrawer({
   profile,
   onChange,
 }: Props) {
+  const panelRef = useRef<HTMLElement>(null);
+  const navigate = useSafeNavigate();
+  useFocusTrap(panelRef, open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -33,23 +40,32 @@ export default function ProfileDrawer({
     };
   }, [open, onOpenChange]);
 
+  function openAccountSettings() {
+    onOpenChange(false);
+    markProfileFromHeader();
+    navigate("/profile");
+  }
+
   return (
     <>
       <div
-        className={`fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
+        className={`fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm transition-opacity duration-200 ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
         onClick={() => onOpenChange(false)}
         aria-hidden
       />
 
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Health profile"
         aria-hidden={!open}
         inert={!open ? true : undefined}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${open ? "translate-x-0" : "translate-x-full pointer-events-none"
-          }`}
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${
+          open ? "translate-x-0" : "translate-x-full pointer-events-none"
+        }`}
       >
         <div className="flex items-center justify-between border-b border-line/60 bg-card px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -83,8 +99,19 @@ export default function ProfileDrawer({
           />
         </div>
 
-        <div className="border-t border-line/60 bg-card px-5 py-3 text-[11px] text-muted-foreground">
-          Changes save automatically. Close when you&apos;re done.
+        <div className="flex flex-col gap-2 border-t border-line/60 bg-card px-5 py-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={openAccountSettings}
+          >
+            Account settings
+          </Button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Health changes save automatically.
+          </p>
         </div>
       </aside>
     </>

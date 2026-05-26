@@ -1,6 +1,7 @@
 """OpenAI chat-completion wrapper used by health_decision_service."""
 
 import logging
+from collections.abc import Iterator
 from functools import lru_cache
 
 from openai import (
@@ -94,6 +95,48 @@ def generate_json(system_instruction: str, user_content: str) -> str:
     if not text:
         raise ValueError("Empty response from OpenAI")
     return text
+
+
+def stream_json(system_instruction: str, user_content: str) -> Iterator[str]:
+    """Stream JSON object content token-by-token."""
+    settings = get_settings()
+    client = _client()
+    try:
+        stream = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=max(256, settings.OPENAI_MAX_OUTPUT_TOKENS),
+            stream=True,
+        )
+    except RateLimitError as exc:
+        raise OpenAIQuotaError(
+            f"OpenAI quota exceeded for {settings.OPENAI_MODEL} (429). "
+            "Check your usage and credit balance at https://platform.openai.com/usage."
+        ) from exc
+    except AuthenticationError as exc:
+        raise RuntimeError(
+            "OpenAI rejected the API key. Verify OPENAI_API_KEY in backend/.env."
+        ) from exc
+    except APITimeoutError as exc:
+        raise RuntimeError(
+            "OpenAI request timed out. Try again in a moment."
+        ) from exc
+    except APIConnectionError as exc:
+        raise RuntimeError(
+            "Could not reach OpenAI. Check your network and try again."
+        ) from exc
+
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta.content or ""
+        if delta:
+            yield delta
 
 
 def probe_openai() -> dict:

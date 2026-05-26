@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef } from "react";
+import { DecisionPartial } from "@/lib/decision-api";
 import { ChatMessage, ChatSession } from "@/lib/types";
 import {
   decisionForMessage,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/chat-messages";
 import DecisionMessage from "@/components/DecisionMessage";
 import MessageSpeakToolbar from "@/components/MessageSpeakToolbar";
+import StreamingDecisionPreview from "@/components/StreamingDecisionPreview";
 import { cn } from "@/lib/utils";
 import { Bot, User as UserIcon } from "lucide-react";
 
@@ -35,6 +37,8 @@ interface Props {
   messages: ChatMessage[];
   activeSession?: ChatSession | null;
   loading?: boolean;
+  streamPartial?: DecisionPartial | null;
+  streamStage?: string;
   onRequestFreshGuidance?: () => void;
 }
 
@@ -42,17 +46,23 @@ function ChatMessageList({
   messages,
   activeSession = null,
   loading,
+  streamPartial,
+  streamStage,
   onRequestFreshGuidance,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(messages.length);
 
   useEffect(() => {
-    if (messages.length !== prevCountRef.current || loading) {
+    if (
+      messages.length !== prevCountRef.current ||
+      loading ||
+      streamPartial?.summary
+    ) {
       bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
     }
     prevCountRef.current = messages.length;
-  }, [messages.length, loading]);
+  }, [messages.length, loading, streamPartial?.summary]);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-5 sm:py-5">
@@ -96,17 +106,15 @@ function ChatMessageList({
 
       {loading ? (
         <div
-          className="animate-fade-in flex gap-3"
+          className="animate-fade-in flex gap-2 sm:gap-3"
           aria-live="polite"
           aria-busy="true"
         >
           <Avatar role="model" />
-          <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-line/60 bg-card px-4 py-3 text-muted-foreground shadow-sm">
-            <span className="sr-only">Generating guidance</span>
-            <span className="typing-dot" />
-            <span className="typing-dot" />
-            <span className="typing-dot" />
-          </div>
+          <StreamingDecisionPreview
+            partial={streamPartial ?? null}
+            stage={streamStage}
+          />
         </div>
       ) : null}
 
