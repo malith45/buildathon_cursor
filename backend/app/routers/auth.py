@@ -59,7 +59,11 @@ def post_signup(body: SignupRequest) -> AuthResponse:
         _raise_auth_error(exc)
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    dependencies=[Depends(require_storage)],
+)
 def post_login(body: LoginRequest) -> AuthResponse:
     try:
         user, token = auth_service.login(body.email, body.password)

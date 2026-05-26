@@ -10,7 +10,8 @@ export interface Disease {
 
 export async function searchDiseases(
   search: string,
-  limit = 20
+  limit = 20,
+  signal?: AbortSignal
 ): Promise<Disease[]> {
   const params = new URLSearchParams();
   if (search.trim()) params.set("search", search.trim());
@@ -18,6 +19,7 @@ export async function searchDiseases(
 
   const res = await fetch(`${BASE}/api/diseases?${params}`, {
     method: "GET",
+    signal,
   });
 
   if (!res.ok) {

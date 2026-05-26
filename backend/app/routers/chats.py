@@ -64,6 +64,27 @@ def sync_chats(
         _handle_storage_error(exc)
 
 
+@router.put(
+    "/{session_id}",
+    response_model=ChatSessionPayload,
+    dependencies=[Depends(require_storage)],
+)
+def upsert_chat(
+    session_id: str,
+    body: ChatSessionPayload,
+    user_id: str = Depends(get_current_user_id),
+) -> ChatSessionPayload:
+    if body.id != session_id:
+        raise HTTPException(status_code=400, detail="Session id mismatch.")
+    try:
+        row = chats_store.upsert_session_for_user(user_id, body.model_dump())
+        return ChatSessionPayload.model_validate(row)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        _handle_storage_error(exc)
+
+
 @router.delete("", status_code=204, dependencies=[Depends(require_storage)])
 def clear_chats(user_id: str = Depends(get_current_user_id)) -> None:
     try:

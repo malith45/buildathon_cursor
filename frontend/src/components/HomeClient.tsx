@@ -12,7 +12,11 @@ import {
   messagesForApi,
   withModelReply,
 } from "@/lib/chat-messages";
-import { fetchChatSessions, syncChatSessions } from "@/lib/chats-api";
+import {
+  fetchChatSessions,
+  syncChatSession,
+  syncChatSessions,
+} from "@/lib/chats-api";
 import {
   clearAllSessions,
   createSession,
@@ -37,6 +41,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage, toast } from "@/lib/toast";
 
 const PROFILE_SYNC_MS = 800;
+const CLOUD_SYNC_MS = 2000;
 
 export default function HomeClient() {
   const { user, loading: authLoading, updateHealthProfile } = useAuth();
@@ -50,8 +55,10 @@ export default function HomeClient() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloudSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGoodSessionsRef = useRef<ChatSession[]>([]);
   const migratedProfileForUserRef = useRef<string | null>(null);
+  const loadedForUserIdRef = useRef<string | null | undefined>(undefined);
   const userId = user?.id ?? null;
   const isMobile = useIsMobile();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -71,29 +78,17 @@ export default function HomeClient() {
 
   useEffect(() => {
     if (authLoading) return;
+    const uid = userId;
+    const accountChanged = loadedForUserIdRef.current !== uid;
+    loadedForUserIdRef.current = uid;
+
     let cancelled = false;
 
-    async function load() {
-      if (!cancelled) setHistoryLoading(true);
+    async function loadHistory() {
+      setHistoryLoading(true);
       if (user) {
         const mergedLocal = mergeGuestSessionsIntoAccount(user.id);
-        const nextProfile = resolveProfileAfterAuth(
-          user.healthProfile,
-          user.id
-        );
-        if (!cancelled) setProfile(nextProfile);
-        const shouldSyncGuestProfile =
-          guestProfileDiffersFromDefault(nextProfile) &&
-          migratedProfileForUserRef.current !== user.id;
-        if (shouldSyncGuestProfile) {
-          migratedProfileForUserRef.current = user.id;
-          void updateHealthProfile(nextProfile).catch(() => {
-            /* local copy already saved in resolveProfileAfterAuth */
-          });
-        }
-
         try {
-          // Show something immediately while cloud fetch resolves.
           if (!cancelled) setSessions(mergedLocal);
           let remote = await fetchChatSessions();
           if (remote.length === 0 && mergedLocal.length > 0) {
@@ -112,7 +107,9 @@ export default function HomeClient() {
         } catch (err) {
           if (!cancelled) {
             const safeFallback =
-              mergedLocal.length > 0 ? mergedLocal : lastGoodSessionsRef.current;
+              mergedLocal.length > 0
+                ? mergedLocal
+                : lastGoodSessionsRef.current;
             setSessions(safeFallback);
             if (safeFallback.length > 0) {
               lastGoodSessionsRef.current = safeFallback;
@@ -131,31 +128,56 @@ export default function HomeClient() {
           }
         }
       } else {
-        migratedProfileForUserRef.current = null;
         if (!cancelled) {
-          setProfile(loadProfile());
           const local = hydrateAllSessions(loadSessions());
           lastGoodSessionsRef.current = local;
           setSessions(local);
         }
       }
+
       if (!cancelled) {
-        setActiveId(null);
-        setMessages([]);
-        setSendError(null);
+        if (accountChanged) {
+          setActiveId(null);
+          setMessages([]);
+          setSendError(null);
+        }
         setHistoryLoading(false);
       }
     }
 
-    void load();
+    void loadHistory();
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading, updateHealthProfile]);
+  }, [userId, authLoading, user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (user) {
+      const nextProfile = resolveProfileAfterAuth(
+        user.healthProfile,
+        user.id
+      );
+      setProfile(nextProfile);
+      const shouldSyncGuestProfile =
+        guestProfileDiffersFromDefault(nextProfile) &&
+        migratedProfileForUserRef.current !== user.id;
+      if (shouldSyncGuestProfile) {
+        migratedProfileForUserRef.current = user.id;
+        void updateHealthProfile(nextProfile).catch(() => {
+          /* local copy already saved */
+        });
+      }
+    } else {
+      migratedProfileForUserRef.current = null;
+      setProfile(loadProfile());
+    }
+  }, [userId, user?.healthProfile, authLoading, user, updateHealthProfile]);
 
   useEffect(() => {
     return () => {
       if (profileSyncTimer.current) clearTimeout(profileSyncTimer.current);
+      if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
     };
   }, []);
 
@@ -210,6 +232,38 @@ export default function HomeClient() {
     [userId]
   );
 
+  const syncOneSessionToCloud = useCallback(
+    async (session: ChatSession) => {
+      if (!userId) return;
+      try {
+        const saved = await syncChatSession(session);
+        setSessions((prev) => {
+          const merged = upsertSession(prev, saved);
+          lastGoodSessionsRef.current = merged;
+          saveSessions(merged, userId);
+          return merged;
+        });
+      } catch (err) {
+        toast.warning(
+          "Chat not saved online",
+          errorMessage(err, "Saved on this device only.")
+        );
+      }
+    },
+    [userId]
+  );
+
+  const scheduleCloudSync = useCallback(
+    (session: ChatSession) => {
+      if (!userId) return;
+      if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
+      cloudSyncTimer.current = setTimeout(() => {
+        void syncOneSessionToCloud(session);
+      }, CLOUD_SYNC_MS);
+    },
+    [userId, syncOneSessionToCloud]
+  );
+
   const persistSessions = useCallback(
     async (next: ChatSession[]) => {
       persistSessionsLocal(next);
@@ -251,8 +305,56 @@ export default function HomeClient() {
     [sessions, activeId, persistSessions]
   );
 
+  const runDecision = useCallback(
+    async (
+      session: ChatSession,
+      transcript: ChatMessage[],
+      options?: { appendUserText?: string }
+    ) => {
+      const apiMessages =
+        options?.appendUserText != null
+          ? messagesForApi([
+              ...transcript,
+              { role: "user", text: options.appendUserText },
+            ])
+          : messagesForApi(transcript);
+
+      const result = await postHealthDecision({
+        profile,
+        messages: apiMessages,
+      });
+
+      const baseMessages =
+        options?.appendUserText != null
+          ? [...transcript, { role: "user" as const, text: options.appendUserText }]
+          : transcript;
+
+      const withReply = withModelReply(
+        baseMessages,
+        result.summary,
+        result
+      );
+      setMessages(withReply);
+
+      const updated = updateSessionMessages(session, withReply, result);
+      const merged = upsertSession(sessions, updated);
+      persistSessionsLocal(merged);
+      retryTextRef.current = null;
+      if (result.fallback) {
+        toast.warning(
+          "Limited AI response",
+          "Using safe fallback guidance. Tap Try again or check OPENAI_API_KEY on the API server."
+        );
+      }
+      scheduleCloudSync(updated);
+      return withReply;
+    },
+    [profile, sessions, persistSessionsLocal, scheduleCloudSync]
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
+      if (authLoading || historyLoading) return;
       setLoading(true);
       setSendError(null);
       retryTextRef.current = text;
@@ -268,25 +370,7 @@ export default function HomeClient() {
       setMessages(nextMessages);
 
       try {
-        const result = await postHealthDecision({
-          profile,
-          messages: messagesForApi(nextMessages),
-        });
-
-        const withReply = withModelReply(nextMessages, result.summary, result);
-        setMessages(withReply);
-
-        const updated = updateSessionMessages(session, withReply, result);
-        const merged = upsertSession(sessions, updated);
-        persistSessionsLocal(merged);
-        retryTextRef.current = null;
-        if (result.fallback) {
-          toast.warning(
-            "Limited AI response",
-            "Using safe fallback guidance. Tap Try again or check OPENAI_API_KEY on the API server."
-          );
-        }
-        void syncSessionsToCloud(merged);
+        await runDecision(session, messages, { appendUserText: text });
       } catch (err) {
         setMessages(messages);
         const msg = errorMessage(
@@ -299,7 +383,13 @@ export default function HomeClient() {
         setLoading(false);
       }
     },
-    [activeSession, messages, profile, sessions, persistSessionsLocal, syncSessionsToCloud]
+    [
+      activeSession,
+      messages,
+      runDecision,
+      authLoading,
+      historyLoading,
+    ]
   );
 
   const handleRetrySend = useCallback(() => {
@@ -307,10 +397,38 @@ export default function HomeClient() {
     if (text) void handleSend(text);
   }, [handleSend]);
 
-  const handleRequestFreshGuidance = useCallback(() => {
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    if (lastUser) void handleSend(lastUser.text);
-  }, [messages, handleSend]);
+  const handleRequestFreshGuidance = useCallback(async () => {
+    if (!activeSession || loading || authLoading || historyLoading) return;
+    const trimmed = [...messages];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1].role === "model") {
+      trimmed.pop();
+    }
+    const lastUser = [...trimmed].reverse().find((m) => m.role === "user");
+    if (!lastUser) return;
+
+    setLoading(true);
+    setSendError(null);
+    setMessages(trimmed);
+    retryTextRef.current = lastUser.text;
+
+    try {
+      await runDecision(activeSession, trimmed);
+    } catch (err) {
+      setMessages(messages);
+      const msg = errorMessage(err, "Could not refresh guidance.");
+      setSendError(msg);
+      toast.error("Could not refresh guidance", msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    activeSession,
+    messages,
+    loading,
+    authLoading,
+    historyLoading,
+    runDecision,
+  ]);
 
   const handleClearAllChats = useCallback(async () => {
     clearAllSessions(userId);
@@ -344,13 +462,14 @@ export default function HomeClient() {
   }, [profile]);
 
   const profileIsDefault = !guestProfileDiffersFromDefault(profile);
+  const chatReady = !authLoading && !historyLoading;
 
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-2 overflow-hidden px-2 py-2 sm:gap-3 sm:px-4 sm:py-3 md:px-6 md:py-4 lg:px-8">
       <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-line/70 bg-card/60 shadow-sm backdrop-blur-sm sm:rounded-2xl">
         <ChatHistorySidebar
           sessions={sessions}
-          loading={historyLoading}
+          loading={historyLoading || authLoading}
           activeId={activeId}
           onSelect={selectSession}
           onNew={startNewSession}
@@ -370,12 +489,13 @@ export default function HomeClient() {
             activeSession={activeSession}
             onSend={handleSend}
             loading={loading}
+            composerDisabled={!chatReady}
             profileIsDefault={profileIsDefault}
             onOpenProfile={() => setProfileOpen(true)}
             sendError={sendError}
             onRetrySend={handleRetrySend}
             onDismissSendError={() => setSendError(null)}
-            onRequestFreshGuidance={handleRequestFreshGuidance}
+            onRequestFreshGuidance={() => void handleRequestFreshGuidance()}
             onOpenSidebar={() => setMobileSidebarOpen(true)}
             onNewChat={startNewSession}
             showMobileNav={isMobile}

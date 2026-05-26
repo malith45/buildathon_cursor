@@ -80,23 +80,34 @@ export default function DiseaseMultiSelect({
 
   useEffect(() => {
     if (!open) return;
+    const q = query.trim();
+    if (q.length > 0 && q.length < 2) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
 
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
-        const results = await searchDiseases(query, 25);
+        const results = await searchDiseases(q, 25, controller.signal);
         const taken = new Set(value.map(normalize));
         setSuggestions(results.filter((d) => !taken.has(normalize(d.name))));
       } catch (err) {
+        if (controller.signal.aborted) return;
         setSuggestions([]);
         setError(errorMessage(err, "Could not load suggestions"));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 280);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [query, open, selectedKey, value]);
 
   const showDropdown = open;

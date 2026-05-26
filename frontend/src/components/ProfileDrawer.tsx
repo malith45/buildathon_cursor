@@ -46,7 +46,9 @@ export default function ProfileDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Health profile"
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${open ? "translate-x-0" : "translate-x-full"
+        aria-hidden={!open}
+        inert={!open ? true : undefined}
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl transition-transform duration-300 ease-out sm:max-w-sm ${open ? "translate-x-0" : "translate-x-full pointer-events-none"
           }`}
       >
         <div className="flex items-center justify-between border-b border-line/60 bg-card px-5 py-4">

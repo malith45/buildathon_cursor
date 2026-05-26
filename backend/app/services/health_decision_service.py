@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.services import openai_service
 from app.services import emergency_escalation
 from app.services import evidence_retrieval
+from app.services.decision_errors import DecisionInfraError
 
 URGENCY_VALUES: set[str] = {
     "self_care",
@@ -21,6 +22,33 @@ URGENCY_VALUES: set[str] = {
 }
 
 _EVIDENCE_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="evidence")
+
+
+def shutdown_evidence_pool() -> None:
+    _EVIDENCE_POOL.shutdown(wait=False)
+
+
+def _infra_message(exc: Exception) -> str:
+    if openai_service.is_quota_error(exc):
+        return (
+            "OpenAI quota or rate limit exceeded. Check usage at "
+            "https://platform.openai.com/usage and retry shortly."
+        )
+    msg = str(exc)
+    if "API key" in msg or "OPENAI_API_KEY" in msg:
+        return "OpenAI API key is invalid or missing on the server."
+    if "timed out" in msg.lower():
+        return msg
+    if "Could not reach OpenAI" in msg:
+        return msg
+    return "AI guidance is temporarily unavailable. Please try again shortly."
+
+
+def _raise_if_infra(exc: Exception) -> None:
+    if isinstance(exc, ValueError) and "Could not parse model JSON" in str(exc):
+        return
+    if openai_service.is_quota_error(exc) or isinstance(exc, RuntimeError):
+        raise DecisionInfraError(_infra_message(exc)) from exc
 
 FALLBACK_DECISION = HealthDecisionResponse(
     urgency="see_doctor_soon",
@@ -184,14 +212,13 @@ def decide(profile: HealthProfile, messages: list[ChatMessage]) -> HealthDecisio
         except Exception as exc:
             last_error = exc
             if openai_service.is_quota_error(exc):
-                break
+                _raise_if_infra(exc)
+            if isinstance(exc, RuntimeError):
+                _raise_if_infra(exc)
             continue
 
+    if last_error:
+        _raise_if_infra(last_error)
+
     fallback = FALLBACK_DECISION.model_copy()
-    if last_error and openai_service.is_quota_error(last_error):
-        fallback.summary = (
-            "OpenAI's API quota or rate limit was exceeded. This is a generic "
-            "safety response. Check your usage at "
-            "https://platform.openai.com/usage and retry shortly."
-        )
     return _attach_evidence(fallback, esc, evidence_future)

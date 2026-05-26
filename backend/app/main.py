@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import sys
@@ -9,10 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.rate_limit import decision_rate_limit_exceeded
+from app.rate_limit import auth_rate_limit_exceeded, decision_rate_limit_exceeded
 from app.routers import auth, chats, diseases, health
 from app.startup_checks import log_startup_connections
+from app.services import health_decision_service
 from app.storage import client as storage_client
+from app.storage import health_state
 from app.storage.errors import is_storage_unavailable
 
 
@@ -39,7 +42,8 @@ async def lifespan(_app: FastAPI):
 
     if settings.storage_configured and storage_client.can_attempt_storage():
         try:
-            storage_client.init_storage()
+            await asyncio.to_thread(storage_client.init_storage)
+            health_state.set_storage_startup_result(True, "Storage ready")
             logger.info("Storage layer ready.")
         except Exception as exc:
             hint = (
@@ -47,6 +51,7 @@ async def lifespan(_app: FastAPI):
                 if str(exc) and "Could not reach" in str(exc)
                 else storage_client.storage_health_hint()
             )
+            health_state.set_storage_startup_result(False, hint[:200])
             logger.warning(
                 "Storage init failed (%s). %s "
                 "Set STORAGE_ENABLED=false to skip GCS, or fix backend/.env.",
@@ -54,18 +59,25 @@ async def lifespan(_app: FastAPI):
                 hint,
             )
     elif settings.storage_configured:
+        health_state.set_storage_startup_result(
+            False, storage_client.storage_health_hint()[:200]
+        )
         logger.warning(
             "Storage skipped at startup: %s",
             storage_client.storage_health_hint(),
         )
+    else:
+        health_state.set_storage_startup_result(False, None)
+
     try:
         from app.storage import diseases_store
 
-        diseases_store.search_diseases("", limit=1)
+        await asyncio.to_thread(diseases_store.search_diseases, "", 1)
         logger.info("Disease catalog preloaded in memory.")
     except Exception:
         logger.warning("Disease catalog preload skipped.", exc_info=True)
     yield
+    health_decision_service.shutdown_evidence_pool()
 
 
 app = FastAPI(
@@ -77,12 +89,17 @@ app = FastAPI(
 settings = get_settings()
 
 @app.middleware("http")
-async def rate_limit_health_decision(request: Request, call_next):
-    if (
-        request.method == "POST"
-        and request.url.path.rstrip("/") == "/api/health/decision"
-    ):
+async def rate_limit_sensitive_routes(request: Request, call_next):
+    path = request.url.path.rstrip("/")
+    if request.method == "POST" and path == "/api/health/decision":
         blocked = decision_rate_limit_exceeded(request)
+        if blocked is not None:
+            return blocked
+    if request.method == "POST" and path in (
+        "/api/auth/login",
+        "/api/auth/signup",
+    ):
+        blocked = auth_rate_limit_exceeded(request)
         if blocked is not None:
             return blocked
     return await call_next(request)

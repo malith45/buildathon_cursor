@@ -61,6 +61,34 @@ def test_decision_success(mock_generate):
 
 
 @patch("app.services.health_decision_service.openai_service.generate_json")
+def test_decision_infra_failure_returns_503(mock_generate):
+    mock_generate.side_effect = RuntimeError(
+        "OpenAI rejected the API key. Verify OPENAI_API_KEY in backend/.env."
+    )
+    res = client.post(
+        "/api/health/decision",
+        json={
+            "profile": {
+                "ageRange": "25-34",
+                "conditions": [],
+                "allergies": [],
+                "medications": "",
+            },
+            "messages": [{"role": "user", "text": "Mild sore throat"}],
+        },
+    )
+    assert res.status_code == 503
+    assert "error" in res.json()
+
+
+def test_health_diseases_ready_without_gcs():
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert "diseasesReady" in data
+
+
+@patch("app.services.health_decision_service.openai_service.generate_json")
 def test_decision_emergency_keyword_escalation(mock_generate):
     """Model says self_care but user text triggers rule-based emergency escalation."""
     mock_generate.return_value = """{

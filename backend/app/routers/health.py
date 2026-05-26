@@ -1,12 +1,15 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.config import assert_openai_key, get_settings
 from app.schemas.health import DecisionRequest, HealthDecisionResponse
 from app.services import health_decision_service
+from app.services.decision_errors import DecisionInfraError
+from app.services import openai_service
 from app.storage import client as storage_client
 from app.storage import diseases_store
+from app.storage import health_state
 from app.storage.errors import is_storage_unavailable
 
 logger = logging.getLogger(__name__)
@@ -22,8 +25,21 @@ def _storage_status() -> tuple[bool, bool, str | None]:
         return False, False, "Set GCS_BUCKET in backend/.env"
     if not storage_client.can_attempt_storage():
         return True, False, storage_client.storage_health_hint()[:200]
-    # Avoid blocking page loads on a live GCS list; catalog uses in-memory seed when needed.
-    return True, False, "Storage configured (connectivity not probed on this endpoint)"
+
+    cached_connected, cached_message = health_state.storage_startup_status()
+    if cached_connected is True:
+        return True, True, cached_message or "Storage ready"
+    if cached_connected is False and cached_message:
+        return True, False, cached_message
+
+    try:
+        storage_client.storage_ping()
+        health_state.set_storage_startup_result(True, "Storage ready")
+        return True, True, "Storage ready"
+    except Exception:
+        hint = storage_client.storage_health_hint()[:200]
+        health_state.set_storage_startup_result(False, hint)
+        return True, False, hint
 
 
 @router.post("/init-storage")
@@ -42,11 +58,15 @@ def post_init_storage() -> dict:
         )
     try:
         storage_client.init_storage()
+        health_state.set_storage_startup_result(True, "Storage ready")
         return {
             "status": "ok",
             "diseasesReady": diseases_store.catalog_ready(),
         }
     except Exception as exc:
+        health_state.set_storage_startup_result(
+            False, storage_client.storage_health_hint()[:200]
+        )
         if is_storage_unavailable(exc):
             raise HTTPException(
                 status_code=503,
@@ -56,11 +76,12 @@ def post_init_storage() -> dict:
 
 
 @router.get("")
-def health_check() -> dict:
+def health_check(probe: bool = Query(False)) -> dict:
     settings = get_settings()
     storage_configured, storage_connected, storage_message = _storage_status()
-    diseases_ready = storage_connected and diseases_store.catalog_ready()
-    return {
+    diseases_ready = diseases_store.catalog_ready()
+
+    payload: dict = {
         "status": "ok",
         "aiConfigured": bool(settings.OPENAI_API_KEY.strip()),
         "aiModel": settings.OPENAI_MODEL,
@@ -74,6 +95,9 @@ def health_check() -> dict:
         ),
         "diseasesReady": diseases_ready,
     }
+    if probe:
+        payload["openai"] = openai_service.probe_openai()
+    return payload
 
 
 @router.post("/decision", response_model=HealthDecisionResponse)
@@ -85,8 +109,9 @@ def post_decision(body: DecisionRequest) -> HealthDecisionResponse:
 
     try:
         result = health_decision_service.decide(body.profile, body.messages)
-        # Always serialize full model so evidenceSnippets / safety fields are present.
         return HealthDecisionResponse.model_validate(result.model_dump())
+    except DecisionInfraError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception:
         logger.exception("Unexpected error in POST /api/health/decision")
         raise HTTPException(

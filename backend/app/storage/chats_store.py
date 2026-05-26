@@ -50,11 +50,12 @@ def list_sessions_for_user(user_id: str) -> list[dict[str, Any]]:
     return sessions
 
 
-def sync_sessions_for_user(
+def upsert_sessions_for_user(
     user_id: str, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Upsert provided sessions for user without deleting other rows."""
+    """Upsert sessions without re-listing the whole prefix from GCS."""
     now_iso = datetime.now(timezone.utc).isoformat()
+    written: list[dict[str, Any]] = []
     for session in sessions:
         session_id = str(session.get("id", ""))
         if not _is_valid_uuid(session_id):
@@ -67,7 +68,25 @@ def sync_sessions_for_user(
             "updatedAt": session.get("updatedAt") or now_iso,
         }
         client.write_json(_chat_path(user_id, session_id), payload)
-    return list_sessions_for_user(user_id)
+        written.append(_payload_to_session(payload))
+    written.sort(key=lambda s: s.get("updatedAt", ""), reverse=True)
+    return written
+
+
+def sync_sessions_for_user(
+    user_id: str, sessions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Upsert provided sessions for user without deleting other rows."""
+    return upsert_sessions_for_user(user_id, sessions)
+
+
+def upsert_session_for_user(
+    user_id: str, session: dict[str, Any]
+) -> dict[str, Any]:
+    rows = upsert_sessions_for_user(user_id, [session])
+    if not rows:
+        raise ValueError("Invalid session id")
+    return rows[0]
 
 
 def delete_all_for_user(user_id: str) -> int:

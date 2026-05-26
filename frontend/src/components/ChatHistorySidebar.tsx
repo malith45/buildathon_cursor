@@ -7,12 +7,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { sessionDisplayTitle } from "@/lib/session-title";
 import { ChatSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import {
-  Loader2,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -221,19 +221,21 @@ export default function ChatHistorySidebar({
 
   const renderExpandedRow = (s: ChatSession) => {
     const isActive = activeId === s.id;
+    const label = sessionDisplayTitle(s);
     return (
       <li key={s.id} className="group relative">
         <button
           type="button"
           onClick={() => handleSelect(s.id)}
+          title={label}
           className={cn(
-            "flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] leading-snug transition-colors",
+            "flex w-full items-center rounded-lg px-3 py-2.5 pr-9 text-left text-[13px] leading-snug transition-colors",
             isActive
               ? "bg-sidebar-accent font-medium text-sidebar-foreground"
               : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70"
           )}
         >
-          <span className="line-clamp-2 min-w-0 flex-1">{s.title}</span>
+          <span className="line-clamp-1 min-w-0 flex-1">{label}</span>
         </button>
         <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <Button
@@ -241,7 +243,7 @@ export default function ChatHistorySidebar({
             variant="ghost"
             size="icon-sm"
             className="size-7 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-            aria-label={`Options for ${s.title}`}
+            aria-label={`Options for ${label}`}
             onClick={(e) => {
               e.stopPropagation();
               setMenuOpenId(menuOpenId === s.id ? null : s.id);
@@ -262,7 +264,7 @@ export default function ChatHistorySidebar({
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
               onClick={() => {
                 setMenuOpenId(null);
-                setPendingDelete({ id: s.id, title: s.title });
+                setPendingDelete({ id: s.id, title: label });
               }}
             >
               <Trash2 className="size-3.5" />
@@ -301,6 +303,7 @@ export default function ChatHistorySidebar({
         )}
         aria-label="Chat history"
         aria-hidden={isMobile && !mobileOpen}
+        inert={isMobile && !mobileOpen ? true : undefined}
         suppressHydrationWarning
         onClick={() => menuOpenId && setMenuOpenId(null)}
       >
@@ -328,9 +331,19 @@ export default function ChatHistorySidebar({
         {showExpanded ? (
           <div className="scrollbar-thin h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-2">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 px-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Loading…
+              <div
+                className="flex flex-col items-center justify-center gap-2.5 px-4 py-12"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div
+                  className="size-5 animate-spin rounded-full border-2 border-sidebar-accent border-t-primary/80"
+                  aria-hidden
+                />
+                <p className="text-center text-xs font-medium tracking-wide text-muted-foreground">
+                  Loading chats
+                </p>
               </div>
             ) : sessions.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">

@@ -12,7 +12,6 @@ _UNAVAILABLE_TYPES: tuple[type[BaseException], ...] = (
     gapi_exceptions.TooManyRequests,
     gapi_exceptions.Forbidden,
     gapi_exceptions.Unauthenticated,
-    gapi_exceptions.NotFound,
     auth_exceptions.GoogleAuthError,
     auth_exceptions.DefaultCredentialsError,
 )

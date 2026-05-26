@@ -11,6 +11,8 @@ interface ModalProps {
   className?: string;
   /** When false, clicking the backdrop won't close the modal. Default: true. */
   closeOnBackdrop?: boolean;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
 }
 
 /**
@@ -25,6 +27,8 @@ export function Modal({
   size = "sm",
   className,
   closeOnBackdrop = true,
+  ariaLabelledBy,
+  ariaDescribedBy,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -56,6 +60,8 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         className={cn(
           "animate-fade-up relative w-full rounded-2xl border border-line/70 bg-card shadow-2xl",
           size === "sm" ? "max-w-sm" : "max-w-md",

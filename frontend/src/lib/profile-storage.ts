@@ -21,7 +21,11 @@ export function saveProfile(
   profile: HealthProfile,
   userId?: string | null
 ): void {
-  localStorage.setItem(profileKey(userId), JSON.stringify(profile));
+  try {
+    localStorage.setItem(profileKey(userId), JSON.stringify(profile));
+  } catch {
+    /* private mode / quota */
+  }
 }
 
 export function clearProfile(userId?: string | null): void {

@@ -44,3 +44,16 @@ export async function syncChatSessions(
   return data.sessions ?? [];
 }
 
+/** Upsert one session — avoids uploading the full history on every message. */
+export async function syncChatSession(
+  session: ChatSession
+): Promise<ChatSession> {
+  const res = await fetch(`${BASE}/api/chats/${session.id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(session),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as ChatSession;
+}

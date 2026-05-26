@@ -1,4 +1,5 @@
 import { hydrateSessionDecisions } from "@/lib/chat-messages";
+import { summarizeChatTitle } from "@/lib/session-title";
 import { ChatMessage, ChatSession, HealthDecisionResponse } from "./types";
 import { createUuid } from "./uuid";
 
@@ -24,14 +25,15 @@ export function saveSessions(
   sessions: ChatSession[],
   userId?: string | null
 ): void {
-  localStorage.setItem(sessionsKey(userId), JSON.stringify(sessions));
+  try {
+    localStorage.setItem(sessionsKey(userId), JSON.stringify(sessions));
+  } catch {
+    /* private mode / quota */
+  }
 }
 
 export function createSession(firstMessage: string): ChatSession {
-  const title =
-    firstMessage.length > 40
-      ? `${firstMessage.slice(0, 40)}…`
-      : firstMessage;
+  const title = summarizeChatTitle(firstMessage);
   return {
     id: createUuid(),
     title: title || "New chat",

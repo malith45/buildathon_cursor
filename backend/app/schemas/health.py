@@ -20,7 +20,7 @@ class HealthProfile(BaseModel):
 
 class ChatMessage(BaseModel):
     role: Literal["user", "model"]
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=4000)
     decision: "HealthDecisionResponse | None" = None
 
 
@@ -35,7 +35,7 @@ class EvidenceSnippet(BaseModel):
 
 class DecisionRequest(BaseModel):
     profile: HealthProfile
-    messages: list[ChatMessage] = Field(min_length=1)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=50)
 
 
 class HealthDecisionResponse(BaseModel):

@@ -79,6 +79,14 @@ def generate_json(system_instruction: str, user_content: str) -> str:
         raise RuntimeError(
             "OpenAI rejected the API key. Verify OPENAI_API_KEY in backend/.env."
         ) from exc
+    except APITimeoutError as exc:
+        raise RuntimeError(
+            "OpenAI request timed out. Try again in a moment."
+        ) from exc
+    except APIConnectionError as exc:
+        raise RuntimeError(
+            "Could not reach OpenAI. Check your network and try again."
+        ) from exc
 
     if not response.choices:
         raise ValueError("Empty response from OpenAI (no choices)")

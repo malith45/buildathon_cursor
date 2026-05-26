@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Override to gpt-4o / gpt-4.1-mini if you want stronger reasoning.
     OPENAI_MODEL: str = "gpt-4o-mini"
     # Retries inside health_decision_service on non-quota failures (0 = one attempt only).
-    OPENAI_DECISION_RETRIES: int = 0
+    OPENAI_DECISION_RETRIES: int = 1
     # Hard request timeout for OpenAI calls (seconds).
     OPENAI_TIMEOUT: float = 20.0
     # Cap model output size for faster completions.

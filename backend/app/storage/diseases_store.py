@@ -7,12 +7,15 @@ per process and cache the result. Search is a case-insensitive contains-match
 performed in memory.
 """
 
+import logging
 import threading
 from typing import Any
 
 from app.config import get_settings
 from app.data.disease_names import DISEASE_CATEGORIES, DISEASE_NAMES
 from app.storage import client
+
+logger = logging.getLogger(__name__)
 
 CATALOG_PATH = "diseases/catalog.json"
 _MIN_CATALOG_SIZE = 50  # if blob has fewer entries we reseed
@@ -35,22 +38,28 @@ def _load_catalog() -> list[dict[str, Any]]:
     with _cache_lock:
         if _cached_catalog is not None:
             return _cached_catalog
-        if not get_settings().storage_configured:
+        if not get_settings().storage_configured or not client.can_attempt_storage():
             _cached_catalog = _build_seed()
             return _cached_catalog
-        data, _ = client.read_json(CATALOG_PATH)
-        if isinstance(data, list) and len(data) >= _MIN_CATALOG_SIZE:
-            _cached_catalog = [
-                {
-                    "id": int(item.get("id") or idx + 1),
-                    "name": str(item.get("name", "")),
-                    "category": item.get("category"),
-                }
-                for idx, item in enumerate(data)
-                if isinstance(item, dict) and item.get("name")
-            ]
-        else:
-            # In-memory catalog when GCS is unavailable — keeps search + evidence working.
+        try:
+            data, _ = client.read_json(CATALOG_PATH)
+            if isinstance(data, list) and len(data) >= _MIN_CATALOG_SIZE:
+                _cached_catalog = [
+                    {
+                        "id": int(item.get("id") or idx + 1),
+                        "name": str(item.get("name", "")),
+                        "category": item.get("category"),
+                    }
+                    for idx, item in enumerate(data)
+                    if isinstance(item, dict) and item.get("name")
+                ]
+            else:
+                _cached_catalog = _build_seed()
+        except Exception:
+            logger.warning(
+                "Could not load disease catalog from GCS; using in-memory seed.",
+                exc_info=True,
+            )
             _cached_catalog = _build_seed()
     return _cached_catalog
 

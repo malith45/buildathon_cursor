@@ -20,7 +20,12 @@ export default function OnboardingDialog() {
   }
 
   return (
-    <Modal open={open} onOpenChange={(v) => !v && close()} size="sm">
+    <Modal
+      open={open}
+      onOpenChange={(v) => !v && close()}
+      size="sm"
+      ariaLabelledBy="onboarding-title"
+    >
       <div className="px-4 py-4 sm:px-5 sm:py-5">
         <div className="mb-3 flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
