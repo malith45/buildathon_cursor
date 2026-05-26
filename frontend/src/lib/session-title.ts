@@ -1,22 +1,37 @@
 import type { ChatSession } from "./types";
 
-/** Cap for persisted `session.title` only — display uses CSS truncate. */
-const STORED_TITLE_MAX = 80;
+/** Saved on the session object. */
+const STORED_TITLE_MAX = 72;
+/** Sidebar row — ChatGPT-like preview length, not the full prompt. */
+const SIDEBAR_TITLE_MAX = 52;
 
 function capitalizeFirst(text: string): string {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** Strip filler openers so the sidebar shows the symptom topic, not the full prompt. */
-function stripLeadIns(text: string): string {
+function trimAtWord(text: string, maxLen: number, minWordBreak: number): string {
+  if (text.length <= maxLen) return text;
+  const slice = text.slice(0, maxLen);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut =
+    lastSpace >= minWordBreak ? slice.slice(0, lastSpace) : slice.trimEnd();
+  return `${cut}…`;
+}
+
+function firstClause(text: string): string {
+  const match = text.match(/^[^.!?\n]+/);
+  return (match?.[0] ?? text).trim();
+}
+
+/** Trim conversational openers so titles read like topics, not full prompts. */
+function stripConversationalOpeners(text: string): string {
   let t = text.trim();
   const patterns = [
     /^(hi|hello|hey)[,!.]?\s+/i,
     /^(please help[,!.]?\s*)/i,
-    /^(i(?:'ve| have| am|'m))\s+(been\s+|had\s+|got\s+|getting\s+|feeling\s+|experiencing\s+)?/i,
+    /^(i(?:'ve| have|'m))\s+(been\s+|had\s+|felt\s+|got\s+|gotten\s+|noticed\s+|experiencing\s+|having\s+|feeling\s+)?/i,
     /^(for\s+(?:the\s+)?(?:past|last)\s+\d+\s+\w+,?\s*)/i,
-    /^(about\s+)?/i,
   ];
   for (const re of patterns) {
     const next = t.replace(re, "");
@@ -26,55 +41,57 @@ function stripLeadIns(text: string): string {
   return t.trim();
 }
 
-/** First clause/sentence — avoids multi-line prompts in the sidebar. */
-function firstClause(text: string): string {
-  const match = text.match(/^[^.!?\n]+/);
-  return (match?.[0] ?? text).trim();
+/**
+ * Core topic from the first user message (stored title + tooltip baseline).
+ */
+export function chatTitleFromMessage(raw: string): string {
+  const line =
+    raw.replace(/\s+/g, " ").trim().split("\n").find((l) => l.trim()) ?? "";
+  if (!line) return "New chat";
+
+  let t = stripConversationalOpeners(firstClause(line));
+  if (!t) t = firstClause(line);
+
+  return capitalizeFirst(t);
 }
 
-/** Readable topic from the user's message (no length chop — sidebar truncates visually). */
-export function cleanSessionTopic(raw: string): string {
-  const normalized = raw.replace(/\s+/g, " ").trim();
-  if (!normalized) return "New chat";
-
-  let topic = stripLeadIns(firstClause(normalized));
-  if (!topic) topic = normalized;
-
-  return capitalizeFirst(topic);
+function firstUserText(session: ChatSession): string {
+  const firstUser = session.messages.find((m) => m.role === "user");
+  return firstUser?.text?.trim() || "";
 }
 
-function trimForStorage(topic: string): string {
-  if (topic.length <= STORED_TITLE_MAX) return topic;
+function buildChatTitle(session: ChatSession): string {
+  const user = firstUserText(session);
+  if (user) return chatTitleFromMessage(user);
 
-  const slice = topic.slice(0, STORED_TITLE_MAX);
-  const lastSpace = slice.lastIndexOf(" ");
-  const cut =
-    lastSpace >= Math.floor(STORED_TITLE_MAX * 0.5)
-      ? slice.slice(0, lastSpace)
-      : slice.trimEnd();
+  const stored = session.title?.trim();
+  if (stored && stored !== "New chat") return stored;
 
-  return `${cut}…`;
+  return "New chat";
 }
 
-/** Title saved on the session object (may be long; UI still prefers first user message). */
+export function summarizeSessionTitle(session: ChatSession): string {
+  const title = buildChatTitle(session);
+  if (title === "New chat") return title;
+  return trimAtWord(title, STORED_TITLE_MAX, 28);
+}
+
 export function summarizeChatTitle(raw: string): string {
-  const topic = cleanSessionTopic(raw);
-  if (topic === "New chat") return topic;
-  return trimForStorage(topic);
+  const title = chatTitleFromMessage(raw);
+  if (title === "New chat") return title;
+  return trimAtWord(title, STORED_TITLE_MAX, 28);
 }
 
-/** Label in the sidebar — uses full cleaned topic; ellipsis only when the row runs out of width. */
+/** Sidebar list — short preview (~ChatGPT width), word-safe ellipsis. */
 export function sessionDisplayTitle(session: ChatSession): string {
-  const firstUser = session.messages.find((m) => m.role === "user");
-  const source = firstUser?.text?.trim() || session.title?.trim();
-  if (!source) return "New chat";
-  return cleanSessionTopic(source);
+  const title = buildChatTitle(session);
+  if (title === "New chat") return title;
+  return trimAtWord(title, SIDEBAR_TITLE_MAX, 22);
 }
 
-/** Native tooltip — full first message when truncated in the list. */
 export function sessionTooltipTitle(session: ChatSession): string {
-  const firstUser = session.messages.find((m) => m.role === "user");
-  const source = firstUser?.text?.trim() || session.title?.trim();
-  if (!source) return "New chat";
-  return source.replace(/\s+/g, " ").trim();
+  const user = firstUserText(session).replace(/\s+/g, " ").trim();
+  if (user) return user;
+  const title = session.title?.trim();
+  return title || "New chat";
 }

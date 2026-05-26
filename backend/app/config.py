@@ -37,8 +37,9 @@ class Settings(BaseSettings):
     AUTH_SECRET: str = "dev-only-change-in-production-buildathon"
     PORT: int = 4000
     CORS_ORIGIN: str = "http://localhost:3000"
-    # Comma-separated allowed browser origins (production Netlify URL, previews, etc.).
+    # Comma-separated allowed browser origins (Vercel custom domain, etc.).
     # When set, used together with CORS_ORIGIN and local dev defaults.
+    # *.vercel.app and *.netlify.app are allowed automatically via cors_origin_regex().
     CORS_ORIGINS: str = ""
     APP_ENV: str = "development"
     # Hard safety switch: destructive storage reset for tests only.
@@ -54,7 +55,7 @@ class Settings(BaseSettings):
     # GOOGLE_APPLICATION_CREDENTIALS env var so google-cloud-storage picks it up.
     # Leave blank to fall back to Application Default Credentials (ADC).
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
-    # Render/Railway: paste the full service-account JSON here (easier than secret files).
+    # Railway / Render / other hosts: paste the full service-account JSON here.
     GCS_CREDENTIALS_JSON: str = ""
 
     @property
@@ -78,6 +79,14 @@ class Settings(BaseSettings):
                 if o:
                     origins.add(o)
         return sorted(origins)
+
+    @staticmethod
+    def cors_origin_regex() -> str:
+        """Vercel and Netlify preview/production hosts without listing every URL."""
+        return (
+            r"https://([a-z0-9-]+\.)*vercel\.app"
+            r"|https://([a-z0-9-]+\.)*netlify\.app"
+        )
 
     def validate_production_secrets(self) -> None:
         """Refuse to boot in production with known-insecure defaults."""

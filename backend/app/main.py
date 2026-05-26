@@ -91,7 +91,10 @@ settings = get_settings()
 @app.middleware("http")
 async def rate_limit_sensitive_routes(request: Request, call_next):
     path = request.url.path.rstrip("/")
-    if request.method == "POST" and path == "/api/health/decision":
+    if request.method == "POST" and path in (
+        "/api/health/decision",
+        "/api/health/decision/stream",
+    ):
         blocked = decision_rate_limit_exceeded(request)
         if blocked is not None:
             return blocked
@@ -108,8 +111,7 @@ async def rate_limit_sensitive_routes(request: Request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list(),
-    # Netlify production + deploy-preview URLs without listing every preview ID.
-    allow_origin_regex=r"https://([a-z0-9-]+\.)*netlify\.app",
+    allow_origin_regex=settings.cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

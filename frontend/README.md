@@ -23,4 +23,4 @@ npm run dev           # terminal 2 (this folder)
 
 ## Deploy
 
-See **[DEPLOY.md](../DEPLOY.md)** and [`netlify.toml`](../netlify.toml).
+See **[DEPLOY.md](../DEPLOY.md)** — Vercel ([`vercel.json`](vercel.json)) + Railway ([`backend/railway.toml`](../backend/railway.toml)).

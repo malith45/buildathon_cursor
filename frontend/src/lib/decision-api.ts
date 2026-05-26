@@ -19,7 +19,7 @@ function apiReachabilityHint(): string {
   if (!onLocalSite && apiIsLocal) {
     return (
       " This site is calling http://localhost:4000, which only works on your PC. " +
-      "On Netlify, set NEXT_PUBLIC_API_URL to your Render API URL and redeploy."
+      "On Vercel, set NEXT_PUBLIC_API_URL to your Railway API URL and redeploy."
     );
   }
   return "";

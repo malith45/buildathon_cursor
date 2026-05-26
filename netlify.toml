@@ -11,4 +11,4 @@
   NODE_VERSION = "20"
 
 # Set in Netlify UI → Site configuration → Environment variables:
-#   NEXT_PUBLIC_API_URL = https://your-api.onrender.com
+#   NEXT_PUBLIC_API_URL = https://your-api.up.railway.app (or Render URL)

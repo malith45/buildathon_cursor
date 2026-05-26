@@ -10,7 +10,7 @@
   <a href="#-try-it-in-2-minutes"><img src="https://img.shields.io/badge/Start-2%20min%20tour-22c55e?style=for-the-badge" alt="2 min tour" /></a>
   <a href="#-what-you-see"><img src="https://img.shields.io/badge/See-Guidance%20card-8b5cf6?style=for-the-badge" alt="Guidance card" /></a>
   <a href="#-for-developers"><img src="https://img.shields.io/badge/Dev-Run%20locally-3b82f6?style=for-the-badge" alt="Developers" /></a>
-  <a href="DEPLOY.md"><img src="https://img.shields.io/badge/Deploy-Netlify%20%2B%20Render-0ea5e9?style=for-the-badge" alt="Deploy" /></a>
+  <a href="DEPLOY.md"><img src="https://img.shields.io/badge/Deploy-Vercel%20%2B%20Railway-0ea5e9?style=for-the-badge" alt="Deploy" /></a>
 </p>
 
 <p align="center">
@@ -258,7 +258,7 @@ npm run dev:frontend   # → http://localhost:3000
 | ⚡ API | FastAPI · Python 3.11+ |
 | 🧠 AI | OpenAI (`gpt-4o-mini` default) — **API only** |
 | 📦 Storage | Google Cloud Storage (optional) |
-| 🌍 Deploy | [DEPLOY.md](DEPLOY.md) — Netlify + Render |
+| 🌍 Deploy | [DEPLOY.md](DEPLOY.md) — Vercel + Railway |
 
 **Scripts:** `install:all` · `dev:backend` · `dev:frontend` · `test:backend`
 
@@ -299,7 +299,7 @@ Schemas: `backend/app/schemas/`
 | Generic fallback answer | Valid `OPENAI_API_KEY` + billing |
 | `503` storage | Fix GCS or `STORAGE_ENABLED=false` |
 | Works local, fails deployed | `NEXT_PUBLIC_API_URL` → public API URL |
-| Slow first hit on Render | Free tier cold start ~30s |
+| Slow first hit on Railway | Cold start after idle — retry once |
 
 More → **[DEPLOY.md](DEPLOY.md)** troubleshooting
 

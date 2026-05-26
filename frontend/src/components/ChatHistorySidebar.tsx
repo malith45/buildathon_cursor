@@ -226,12 +226,13 @@ export default function ChatHistorySidebar({
     const isActive = activeId === s.id;
     const label = sessionDisplayTitle(s);
     const tooltip = sessionTooltipTitle(s);
+    const showTooltip = tooltip.length > label.length;
     return (
       <li key={s.id} className="group relative min-w-0">
         <button
           type="button"
           onClick={() => handleSelect(s.id)}
-          title={tooltip !== label ? tooltip : undefined}
+          title={showTooltip ? tooltip : undefined}
           className={cn(
             "flex h-8 min-w-0 w-full items-center rounded-md py-0 pl-2.5 pr-9 text-left text-[13px] leading-snug transition-colors",
             isActive

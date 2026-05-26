@@ -1,4 +1,4 @@
-# MediAssist API — https://dashboard.render.com → New → Blueprint
+# MediAssist API (Render) — optional; prefer Railway — see DEPLOY.md
 services:
   - type: web
     name: mediassist-api

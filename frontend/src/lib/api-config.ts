@@ -4,7 +4,7 @@ export function getApiBaseUrl(): string {
   return API_BASE;
 }
 
-/** Production site pointing at localhost — common Netlify misconfiguration. */
+/** Production site pointing at localhost — common Vercel/Netlify misconfiguration. */
 export function isMisconfiguredApiUrl(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname;

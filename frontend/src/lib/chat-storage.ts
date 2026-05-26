@@ -1,5 +1,5 @@
 import { hydrateSessionDecisions } from "@/lib/chat-messages";
-import { summarizeChatTitle } from "@/lib/session-title";
+import { summarizeChatTitle, summarizeSessionTitle } from "@/lib/session-title";
 import { ChatMessage, ChatSession, HealthDecisionResponse } from "./types";
 import { createUuid } from "./uuid";
 
@@ -67,7 +67,10 @@ export function updateSessionMessages(
     lastDecision: lastDecision ?? session.lastDecision,
     updatedAt: new Date().toISOString(),
   });
-  return hydrated;
+  return {
+    ...hydrated,
+    title: summarizeSessionTitle(hydrated),
+  };
 }
 
 export function clearAllSessions(userId?: string | null): void {
