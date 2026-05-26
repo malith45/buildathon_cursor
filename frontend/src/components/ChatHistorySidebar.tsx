@@ -7,7 +7,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { sessionDisplayTitle } from "@/lib/session-title";
+import {
+  sessionDisplayTitle,
+  sessionTooltipTitle,
+} from "@/lib/session-title";
 import { ChatSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -222,22 +225,24 @@ export default function ChatHistorySidebar({
   const renderExpandedRow = (s: ChatSession) => {
     const isActive = activeId === s.id;
     const label = sessionDisplayTitle(s);
+    const tooltip = sessionTooltipTitle(s);
     return (
-      <li key={s.id} className="group relative">
+      <li key={s.id} className="group relative min-w-0">
         <button
           type="button"
           onClick={() => handleSelect(s.id)}
-          title={label}
+          title={tooltip !== label ? tooltip : undefined}
           className={cn(
-            "flex w-full items-center rounded-lg px-3 py-2.5 pr-9 text-left text-[13px] leading-snug transition-colors",
+            "flex h-8 min-w-0 w-full items-center rounded-md py-0 pl-2.5 pr-9 text-left text-[13px] leading-snug transition-colors",
             isActive
               ? "bg-sidebar-accent font-medium text-sidebar-foreground"
               : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70"
           )}
         >
-          <span className="line-clamp-1 min-w-0 flex-1">{label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
         </button>
-        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex w-9 items-center justify-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          <div className="pointer-events-auto">
           <Button
             type="button"
             variant="ghost"
@@ -251,6 +256,7 @@ export default function ChatHistorySidebar({
           >
             <MoreHorizontal className="size-3.5" />
           </Button>
+          </div>
         </div>
         {menuOpenId === s.id ? (
           <div
@@ -329,7 +335,7 @@ export default function ChatHistorySidebar({
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {showExpanded ? (
-          <div className="scrollbar-thin h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-2">
+          <div className="scrollbar-thin h-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-2">
             {loading ? (
               <div
                 className="flex flex-col items-center justify-center gap-2.5 px-4 py-12"
@@ -359,7 +365,7 @@ export default function ChatHistorySidebar({
                       <p className="mb-1 px-2 text-[11px] font-medium text-muted-foreground">
                         {GROUP_LABELS[key]}
                       </p>
-                      <ul className="space-y-0.5">{group.map(renderExpandedRow)}</ul>
+                      <ul className="space-y-px">{group.map(renderExpandedRow)}</ul>
                     </div>
                   );
                 })}

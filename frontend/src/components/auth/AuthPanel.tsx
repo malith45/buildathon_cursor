@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity } from "lucide-react";
-import { APP_NAME } from "@/lib/brand";
+import BrandLogo from "@/components/BrandLogo";
 
 interface Props {
   title: string;
@@ -23,14 +22,10 @@ export default function AuthPanel({ title, subtitle, children, footer }: Props) 
     <div className="animate-fade-up w-full max-w-md">
       <Link
         href="/"
-        className="group/back mx-auto mb-5 flex w-fit items-center gap-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="group/back mx-auto mb-5 flex w-fit transition-transform hover:scale-[1.02]"
+        aria-label="Back to home"
       >
-        <span className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary to-lavender text-primary-foreground shadow-sm transition-transform group-hover/back:scale-105">
-          <Activity className="size-4" />
-        </span>
-        <span className="font-heading text-base font-semibold text-foreground">
-          {APP_NAME}
-        </span>
+        <BrandLogo size="md" />
       </Link>
 
       <Card className="gap-0 overflow-hidden border-line/70 bg-card/95 py-0 shadow-(--shadow-card) backdrop-blur-sm">

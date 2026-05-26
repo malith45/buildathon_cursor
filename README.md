@@ -1,443 +1,330 @@
-# MediAssist AI
+<p align="center">
+  <img src="docs/assets/readme-banner.png" alt="MediAssist AI — symptom guidance you can trust" width="100%" />
+</p>
 
-Educational health triage assistant: symptom chat, urgency guidance, care steps, and health education. **All OpenAI calls run on the backend only** — the frontend never sees your API key.
+<p align="center">
+  <strong>Describe how you feel. Get clear, educational guidance — not a diagnosis.</strong>
+</p>
 
-**Stack:** Next.js 16 (React 19, Tailwind 4, shadcn/ui) + FastAPI (Python 3.11+) + Google Cloud Storage (`google-cloud-storage`) + OpenAI (`openai` SDK, `gpt-4o-mini` by default).
+<p align="center">
+  <a href="#-try-it-in-2-minutes"><img src="https://img.shields.io/badge/Start-2%20min%20tour-22c55e?style=for-the-badge" alt="2 min tour" /></a>
+  <a href="#-what-you-see"><img src="https://img.shields.io/badge/See-Guidance%20card-8b5cf6?style=for-the-badge" alt="Guidance card" /></a>
+  <a href="#-for-developers"><img src="https://img.shields.io/badge/Dev-Run%20locally-3b82f6?style=for-the-badge" alt="Developers" /></a>
+  <a href="DEPLOY.md"><img src="https://img.shields.io/badge/Deploy-Netlify%20%2B%20Render-0ea5e9?style=for-the-badge" alt="Deploy" /></a>
+</p>
 
----
-
-## Features
-
-| Area | What it does |
-|------|----------------|
-| **Triage** | `POST /api/health/decision` — urgency (`self_care` → `emergency`), summary, care steps, education, red flags |
-| **Profile-aware AI** | Every decision sends the saved **health profile** (age, sex, conditions, allergies, medications, pregnancy) so guidance is tailored in the prompt and JSON output |
-| **Safety escalation** | Rule-based **emergency / urgent keyword** scan on user messages; merges with model urgency (never downgrades), adds red flags + `safetyEscalation` / `safetyNote` |
-| **Explainability** | `evidenceSnippets` on each response — catalog search + **MedlinePlus (NIH)** links so advice is paired with trusted reading, not a black box |
-| **Accounts** | Sign up, log in, JWT auth, health profile stored per user (JSON blob in GCS) |
-| **Chat history** | Logged-in users sync sessions to GCS; guests use browser `localStorage` |
-| **Disease catalog** | Search 120+ conditions for profile multi-select (seeded once into GCS) |
-| **System status** | UI panel + `GET /api/health?probe=true` for OpenAI / GCS checks |
-| **Theme** | App-wide **light / dark** mode (header toggle, persisted in `localStorage`) |
-
-**Not provided:** medical diagnosis, prescriptions, or emergency services.
-
----
-
-## What makes MediAssist AI special
-
-Most consumer **AI health assistants** (e.g. Ada, Buoy, K Health, Babylon-style chatbots, generic ChatGPT health plugins) optimize for a fast conversational answer. MediAssist is built for **trustworthy triage UX** in a hackathon-grade full stack:
-
-| Capability | Typical AI health chatbot | MediAssist AI |
-|------------|---------------------------|---------------|
-| **Personalization** | Often generic unless you repeat context each turn | **Structured health profile** is mandatory context on every `POST /api/health/decision` |
-| **Emergency safety** | Model-only urgency; can under-call emergencies | **Keyword escalation layer** (chest pain, stroke-like symptoms, self-harm, etc.) **raises** urgency even if the model is optimistic |
-| **Transparency** | Advice with no sources | **`evidenceSnippets`** — retrieved catalog lines + NIH MedlinePlus search links in the UI |
-| **Data ownership** | Vendor cloud DB | **Your GCS bucket** — users, chats, disease catalog as JSON you control |
-| **AI provider** | Closed widget or single vendor | **OpenAI on the backend only** (key never in the browser); swappable model via `OPENAI_MODEL` |
-| **Offline / guest use** | Account required | **Guest triage** works without GCS; sign-in syncs profile + chats |
-
-**Our specialties (what we emphasize):**
-
-1. **Profile-first triage** — age, pregnancy, allergies, and conditions shape care steps, education, and red flags.  
-2. **Defense in depth for urgency** — LLM JSON + deterministic safety rules = harder to miss “seek care now” scenarios.  
-3. **Explainability by design** — every triage card can show “References & trusted reading,” not just a summary paragraph.  
-4. **Full-stack transparency** — FastAPI + GCS + Next.js; no hidden Gemini/Supabase lock-in in the current tree.  
-5. **Educational guardrails** — system prompt and UI disclaimers; no diagnosis or prescribing narrative.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/FastAPI-Python%203.11-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/OpenAI-Backend%20only-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI" />
+  <img src="https://img.shields.io/badge/GCS-Optional-4285F4?style=flat-square&logo=googlecloud&logoColor=white" alt="GCS" />
+  <img src="https://img.shields.io/badge/Educational-Not%20medical%20advice-f59e0b?style=flat-square" alt="Educational" />
+</p>
 
 ---
 
-## Architecture
+### 🚨 Before you read anything else
+
+<table>
+<tr>
+<td width="48">
+
+🆘
+
+</td>
+<td>
+
+**Emergency?** If you or someone else might be in immediate danger, **call your local emergency number now** (911 · 999 · 112). MediAssist cannot send help or monitor you in real time.
+
+</td>
+</tr>
+</table>
+
+---
+
+## ✨ At a glance
+
+<table>
+<tr>
+<th>💬 You get</th>
+<th>🌐 You need</th>
+<th>🚫 We never</th>
+<th>🛠 Built with</th>
+</tr>
+<tr>
+<td>A chat + a colorful <strong>guidance card</strong> (urgency, steps, red flags, trusted links)</td>
+<td>Any modern browser — <strong>no account required</strong> to try</td>
+<td>Diagnose, prescribe, or dispatch EMS</td>
+<td>Next.js · FastAPI · OpenAI · optional GCS</td>
+</tr>
+</table>
+
+MediAssist AI is a **symptom chat** that helps you think through how urgent things might be, what to consider next, and where to read more (including **NIH MedlinePlus**) — for **learning and planning**, not replacing your clinician.
+
+---
+
+## 🚀 Try it in 2 minutes
+
+```
+  ① Open app          ② Health profile       ③ Describe symptoms
+       │                      │                        │
+       ▼                      ▼                        ▼
+   Welcome screen      Age · allergies ·        "Headache 2 days,
+                       conditions · meds         worse in morning"
+                                                       │
+                                                       ▼
+                                              ④ Read guidance card
+                                                 (urgency + steps + links)
+```
+
+| Step | Do this |
+|:---:|:---|
+| **1** | Open the app — skim the welcome message |
+| **2** | Fill **Health profile** (sidebar or Account) |
+| **3** | Type symptoms naturally — duration, severity, triggers |
+| **4** | Read the **guidance card** under the reply |
+| **5** | **Sign up** only if you want cloud sync — guests work fine |
+
+<details>
+<summary><strong>⌨️ Quick tips</strong></summary>
+
+- **Enter** → send · **Shift+Enter** → new line  
+- **New chat** in the sidebar for a fresh topic  
+- **Light / dark** toggle in the header  
+- On mobile, open history from the **menu** icon  
+
+</details>
+
+---
+
+## 🎨 What you see
+
+Every reply ships a **guidance card** — structured, scannable, color-coded. Not a wall of AI text.
+
+### Urgency levels (color-coded in the app)
+
+<table>
+<tr>
+<td align="center"><strong>🟢 Self-care</strong><br/><sub>Manage at home</sub></td>
+<td align="center"><strong>🟣 See a doctor soon</strong><br/><sub>Clinic in a few days</sub></td>
+<td align="center"><strong>🔵 Urgent care</strong><br/><sub>Same-day visit</sub></td>
+<td align="center"><strong>🔴 Emergency</strong><br/><sub>Call emergency services</sub></td>
+</tr>
+<tr>
+<td colspan="4" align="center"><sub>Emergency level shows a sticky banner with 911 · 999 · 112 reminders</sub></td>
+</tr>
+</table>
+
+| Piece | What it gives you |
+|:---:|:---|
+| 📋 **Summary** | Plain English, tuned to your profile |
+| ✅ **Care steps** | Practical ideas — never prescriptions or doses |
+| 📚 **Education** | Context so the “why” makes sense |
+| ⚠️ **Red flags** | “Stop and get help” warning signs |
+| 🔗 **References** | MedlinePlus + our **120-condition** learning catalog |
+| 🔊 **Read aloud** | Optional TTS in supported browsers |
+
+---
+
+## 🧠 How MediAssist thinks
 
 ```mermaid
-flowchart LR
-  subgraph client [Frontend :3000]
-    UI[Next.js App]
-    LS[localStorage]
-  end
-  subgraph api [Backend :4000]
-    R[FastAPI routers]
-    S[Services]
-    O[OpenAI API]
-    GCS[(Google Cloud Storage)]
-  end
-  UI -->|REST + Bearer JWT| R
-  UI --> LS
-  R --> S
-  S --> O
-  S --> GCS
+flowchart TB
+  classDef user fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+  classDef ai fill:#ede9fe,stroke:#8b5cf6,color:#4c1d95
+  classDef safe fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+  classDef trust fill:#d1fae5,stroke:#22c55e,color:#14532d
+
+  You([👤 You describe symptoms]):::user
+  Profile[(📋 Health profile)]:::user
+  AI{{🤖 AI guidance}}:::ai
+  Rules{{🛡️ Safety keyword check}}:::safe
+  Sources[(📖 MedlinePlus + catalog)]:::trust
+  Card([💳 Guidance card]):::trust
+
+  You --> Profile
+  Profile --> AI
+  You --> Rules
+  AI --> Card
+  Rules --> Card
+  Sources --> Card
 ```
 
-**Backend layout** (`backend/app/`):
+| Layer | Role |
+|:---:|:---|
+| 👤 **Your profile** | Age, pregnancy, conditions, allergies, meds — sent every time so you don’t repeat yourself |
+| 🤖 **The AI** | No diagnosis · no prescriptions · plain language · flags true emergencies |
+| 🛡️ **Safety rules** | Extra scan of *your* words — can **raise** urgency, never lower it |
+| 📖 **Sources** | Links on the card so you can verify, not just trust a paragraph |
 
-```
-main.py              # FastAPI app, CORS, exception handlers
-config.py            # Pydantic settings from .env (OpenAI + GCS)
-routers/             # health, auth, chats, diseases
-services/            # openai_service, health_decision_service, auth_service,
-                     # emergency_escalation, evidence_retrieval
-storage/             # GCS client, users_store, chats_store, diseases_store
-schemas/             # Pydantic request/response models
-prompts/             # OpenAI system prompt
-security/            # password hashing
-```
+### Guest vs signed in
 
-**GCS bucket layout:**
-
-```
-{bucket}/
-  users/{user_id}.json                  # full user record (password hash, profile)
-  indexes/users_by_email.json           # { email -> user_id } for login lookup
-  chats/{user_id}/{chat_id}.json        # one file per chat session
-  diseases/catalog.json                 # seeded once from data/disease_names.py
-```
-
-**Frontend layout** (`frontend/src/`):
-
-```
-app/                 # /, /login, /signup, /profile
-components/          # Chat, DecisionMessage, HealthProfileForm, ThemeToggle, auth, ui
-contexts/            # AuthContext
-lib/                 # apiClient, auth-api, chats-api, diseases-api, storage
-```
+| | 👋 Guest | 🔐 Signed in |
+|:---:|:---:|:---:|
+| Chat & triage | ✅ | ✅ |
+| Profile & history | 💾 This device | ☁️ Your cloud bucket |
+| After login | — | Guest data can **merge** in |
 
 ---
 
-## Prerequisites
+## 💎 Why people like MediAssist
 
-- **Node.js** 18+
-- **Python** 3.11+
-- **OpenAI API key** — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- **Google Cloud project + GCS bucket** (optional — needed for accounts, cloud chat sync, disease catalog)
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**🎯 Profile-first**  
+Context travels with you — not lost in chat memory.
+
+**🛡️ Defense in depth**  
+Model + keyword safety when wording sounds serious.
+
+**🔍 Show your work**  
+References on every card, not a black box.
+
+</td>
+<td width="50%" valign="top">
+
+**☁️ Your bucket**  
+Optional GCS — *your* JSON, not a locked vendor DB.
+
+**🔒 Keys on server**  
+OpenAI never runs in the browser.
+
+**🚪 No gatekeeping**  
+Full triage as a guest; account when *you* want sync.
+
+</td>
+</tr>
+</table>
 
 ---
 
-## Quick start
+## ⛔ What we are *not*
 
-### 1. Install dependencies
+<table>
+<tr>
+<td>❌</td><td>Medical <strong>diagnosis</strong></td>
+<td>❌</td><td><strong>Prescriptions</strong> or dosing</td>
+</tr>
+<tr>
+<td>❌</td><td><strong>EMS dispatch</strong> or live monitoring</td>
+<td>❌</td><td>A replacement for your <strong>clinician</strong> or nurse line</td>
+</tr>
+</table>
 
-From the repo root:
+Use MediAssist to **learn and plan**. Use professionals and emergency services when it truly matters.
+
+---
+
+## 👩‍💻 For developers
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Clone-install-run-success?style=for-the-badge" alt="Clone install run" />
+</p>
+
+### Run locally (copy-paste)
 
 ```bash
 npm run install:all
-```
-
-This installs frontend npm packages and Python packages from `backend/requirements.txt`.
-
-### 2. Backend environment
-
-```bash
 cp backend/.env.example backend/.env
 ```
 
-Edit `backend/.env` — minimum for AI-only local dev (no accounts, no cloud chat history):
+`backend/.env` — minimum for triage **without** accounts:
 
 ```env
 OPENAI_API_KEY=sk-your-key-here
-AUTH_SECRET=change-this-to-a-long-random-string
-PORT=4000
-CORS_ORIGIN=http://localhost:3000
+AUTH_SECRET=any-long-random-string-for-local-dev
 STORAGE_ENABLED=false
 ```
 
-For **full features** (auth, diseases, chat sync), configure GCS — see [Storage setup](#storage-setup-gcs) below — and set `STORAGE_ENABLED=true`.
-
-### 3. Frontend environment
-
-Create `frontend/.env.local`:
+`frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:4000
 ```
 
-### 4. Run
+```bash
+npm run dev:backend    # → http://localhost:4000
+npm run dev:frontend   # → http://localhost:3000
+```
 
-**Terminal 1 — backend:**
+### Stack at a glance
+
+| Layer | Tech |
+|:---:|:---|
+| 🖥 Frontend | Next.js 16 · React 19 · Tailwind 4 · shadcn/ui |
+| ⚡ API | FastAPI · Python 3.11+ |
+| 🧠 AI | OpenAI (`gpt-4o-mini` default) — **API only** |
+| 📦 Storage | Google Cloud Storage (optional) |
+| 🌍 Deploy | [DEPLOY.md](DEPLOY.md) — Netlify + Render |
+
+**Scripts:** `install:all` · `dev:backend` · `dev:frontend` · `test:backend`
+
+<details>
+<summary><strong>☁️ Enable GCS (accounts + sync)</strong></summary>
+
+1. Create `gs://mediassist-your-name`  
+2. Service account → **Storage Object Admin**  
+3. `STORAGE_ENABLED=true`, `GCS_BUCKET=...`, credentials via file or `GCS_CREDENTIALS_JSON`  
+4. Restart API — disease catalog auto-seeds  
+
+See **[backend/.env.example](backend/.env.example)** and **[DEPLOY.md](DEPLOY.md)**.
+
+</details>
+
+<details>
+<summary><strong>🔌 API cheat sheet</strong></summary>
+
+| What | Endpoint |
+|:---|:---|
+| Health | `GET /api/health` |
+| Triage | `POST /api/health/decision` |
+| Stream | `POST /api/health/decision/stream` |
+| Auth | `POST /api/auth/signup` · `login` |
+| Profile | `GET/PATCH /api/auth/me` · `profile` |
+| Chats | `GET/PUT/DELETE /api/chats` |
+| Diseases | `GET /api/diseases?search=...` |
+
+Schemas: `backend/app/schemas/`
+
+</details>
+
+<details>
+<summary><strong>🔧 Something broken?</strong></summary>
+
+| Symptom | Try |
+|:---|:---|
+| Generic fallback answer | Valid `OPENAI_API_KEY` + billing |
+| `503` storage | Fix GCS or `STORAGE_ENABLED=false` |
+| Works local, fails deployed | `NEXT_PUBLIC_API_URL` → public API URL |
+| Slow first hit on Render | Free tier cold start ~30s |
+
+More → **[DEPLOY.md](DEPLOY.md)** troubleshooting
+
+</details>
+
+### Tests
 
 ```bash
-cd backend
-python -m uvicorn app.main:app --reload --port 4000
+npm run test:backend
 ```
 
-**Terminal 2 — frontend:**
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open **[http://localhost:3000](http://localhost:3000)**.
+Mocks OpenAI · no GCS charges.
 
 ---
 
-## Storage setup (GCS)
+## 📜 Disclaimer
 
-### A. Create a bucket
+<p align="center">
+  <img src="https://img.shields.io/badge/Disclaimer-Educational%20use%20only-f59e0b?style=flat-square" alt="Disclaimer" />
+</p>
 
-Using `gcloud` CLI ([install](https://cloud.google.com/sdk/docs/install)):
+MediAssist AI is for **educational purposes only**. It does not provide medical diagnosis, prescriptions, or emergency services. Always talk to qualified healthcare professionals about medical decisions.
 
-```bash
-# Pick any globally-unique name; the suffix can be anything
-gcloud storage buckets create gs://mediassist-<your-suffix> --location=US
-```
+<p align="center"><strong>If you think you are having a medical emergency, call your local emergency number immediately.</strong></p>
 
-Or in the **GCP Console → Cloud Storage → Buckets → Create**:
-- Name: `mediassist-<your-suffix>` (globally unique)
-- Location type: Region (e.g. `us-central1`) for cheapest costs
-- Default storage class: Standard
-- Access control: Uniform
-- Leave public access prevention **enabled**
-
-### B. Set up authentication (pick ONE)
-
-**Option 1 — Service-account JSON (recommended for Windows / no `gcloud`):**
-
-1. **GCP Console → IAM & Admin → Service Accounts → Create**:
-   - Name: `mediassist-backend`
-   - Grant role: **Storage Object Admin** (scoped to the bucket above)
-2. Click the new account → **Keys → Add key → Create new key → JSON**.
-3. Save the downloaded JSON somewhere safe (NOT in this repo).
-4. Put the absolute path in `backend/.env`:
-   ```env
-   GOOGLE_APPLICATION_CREDENTIALS=C:/Users/you/secrets/mediassist-sa.json
-   ```
-
-**Option 2 — Application Default Credentials (if you already use `gcloud`):**
-
-```bash
-gcloud auth application-default login
-```
-
-Then leave `GOOGLE_APPLICATION_CREDENTIALS` blank in `backend/.env`.
-
-### C. Wire up `backend/.env`
-
-```env
-OPENAI_API_KEY=sk-your-key
-OPENAI_MODEL=gpt-4o-mini
-
-STORAGE_ENABLED=true
-GCS_BUCKET=mediassist-<your-suffix>
-GCS_PROJECT=                                  # optional; auto-detected from creds
-GOOGLE_APPLICATION_CREDENTIALS=               # path to SA JSON, or blank for ADC
-```
-
-Restart the backend. You should see in the console:
-
-```
-📦  Storage:  ✅  Connected (gs://mediassist-<your-suffix>)
-🤖  OpenAI:   🔑  API key set, model=gpt-4o-mini (live probe skipped)
-```
-
-On first startup the disease catalog is auto-seeded to `gs://<bucket>/diseases/catalog.json`.
-
-### D. (Optional) Migrate your old Supabase user
-
-If you previously used the Supabase-backed version and want to keep your account:
-
-```bash
-cd backend
-python -m scripts.migrate_user_from_supabase --email you@example.com \
-    --supabase-url "postgresql://postgres.xxx:pwd@aws-...pooler.supabase.com:5432/postgres?sslmode=require"
-```
-
-This is a one-off script. Once you've migrated, you can:
-
-1. Remove `psycopg2-binary` from `backend/requirements.txt`
-2. Delete `backend/scripts/migrate_user_from_supabase.py`
-
----
-
-## Testing
-
-### Backend (pytest)
-
-```bash
-cd backend
-pip install -r requirements.txt
-python -m pytest tests -q
-```
-
-The test suite does **not** call the live OpenAI API or hit GCS. Storage is disabled and OpenAI is mocked via `tests/conftest.py`.
-
-### Manual smoke test
-
-1. `GET http://localhost:4000/api/health` — `status: ok`, `aiConfigured`, `storageConnected`, `diseasesReady`
-2. `GET http://localhost:4000/api/health?probe=true` — live OpenAI probe (~$0.00002)
-3. Sign up at `/signup`, send a symptom in chat, confirm the triage panel updates (not fallback text)
-
----
-
-## API reference
-
-Base URL: `http://localhost:4000` (or `NEXT_PUBLIC_API_URL`).
-
-### Health
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/health` | No | Status, `aiConfigured`, `aiModel`, `storageConnected`, `storageBucket`, `diseasesReady` |
-| `GET` | `/api/health?probe=true` | No | Above + live OpenAI probe |
-| `POST` | `/api/health/decision` | No | Triage JSON (see below) |
-| `POST` | `/api/health/init-storage` | No | Dev helper: verify bucket + seed diseases |
-
-**Decision request:**
-
-```json
-{
-  "profile": {
-    "ageRange": "25-34",
-    "sex": "female",
-    "conditions": ["Asthma"],
-    "allergies": [],
-    "medications": "",
-    "pregnant": false
-  },
-  "messages": [
-    { "role": "user", "text": "Mild headache for 2 hours." }
-  ]
-}
-```
-
-**Decision response:**
-
-```json
-{
-  "urgency": "self_care",
-  "summary": "...",
-  "careSteps": ["..."],
-  "education": ["..."],
-  "redFlags": ["..."],
-  "disclaimer": "...",
-  "fallback": false,
-  "evidenceSnippets": [
-    {
-      "title": "MedlinePlus search",
-      "source": "NIH MedlinePlus",
-      "snippet": "Trusted consumer health information (search results).",
-      "url": "https://medlineplus.gov/search.html?query=..."
-    }
-  ],
-  "safetyEscalation": false,
-  "safetyNote": null
-}
-```
-
-- `fallback: true` — OpenAI failed; check API key, credit balance, and `OPENAI_MODEL`.  
-- `safetyEscalation: true` — rule-based layer raised urgency or added an extra safety note (see `safetyNote`).  
-- `evidenceSnippets` — always includes at least a MedlinePlus link; catalog matches appear when GCS disease data is available.
-
-### Auth (requires GCS)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/auth/signup` | `{ email, password, name }` → `{ user, token }` |
-| `POST` | `/api/auth/login` | `{ email, password }` → `{ user, token }` |
-| `GET` | `/api/auth/me` | Bearer token → current user |
-| `PATCH` | `/api/auth/profile` | Update `name` and/or `healthProfile` |
-
-### Chats (Bearer token, requires GCS)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/chats` | List sessions for user |
-| `PUT` | `/api/chats` | Sync `{ sessions: [...] }` (merge by id) |
-| `DELETE` | `/api/chats` | Clear all sessions for user |
-
-### Diseases (requires GCS)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/diseases?search=asthma&limit=20` | Search disease catalog |
-
----
-
-## Environment variables
-
-### Backend (`backend/.env`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | — | OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys) |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Override with `gpt-4o`, `gpt-4.1-mini`, etc. |
-| `OPENAI_DECISION_RETRIES` | `1` | Retries on non-quota failures |
-| `OPENAI_PROBE_ON_STARTUP` | `false` | Live OpenAI ping on server boot |
-| `OPENAI_TIMEOUT` | `30` | Hard request timeout in seconds |
-| `AUTH_SECRET` | dev placeholder | JWT signing secret — change in production |
-| `PORT` | `4000` | API port |
-| `CORS_ORIGIN` | `http://localhost:3000` | Allowed frontend origin |
-| `STORAGE_ENABLED` | `true` | `false` = no GCS (health/decision only) |
-| `GCS_BUCKET` | — | Bucket name (no `gs://` prefix) |
-| `GCS_PROJECT` | — | Optional explicit GCP project ID |
-| `GOOGLE_APPLICATION_CREDENTIALS` | — | Path to service-account JSON (or blank for ADC) |
-| `APP_ENV` | `development` | Environment label |
-| `ALLOW_TEST_DATA_RESET` | `false` | Destructive test reset (keep `false`) |
-
-### Frontend (`frontend/.env.local`)
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | Backend base URL (default `http://localhost:4000`) |
-
----
-
-## Troubleshooting
-
-| Issue | What to do |
-|-------|------------|
-| Triage returns generic fallback | Set valid `OPENAI_API_KEY`; check usage at [platform.openai.com/usage](https://platform.openai.com/usage) |
-| `503` OpenAI not configured | Add `OPENAI_API_KEY` to `backend/.env` and restart backend |
-| `503` Storage unavailable | Fix `GCS_BUCKET` + credentials, or set `STORAGE_ENABLED=false` for AI-only mode |
-| `Storage init failed` | Check service account has `Storage Object Admin` on the bucket and the bucket exists |
-| `Could not reach GCS bucket` | Check network, bucket name typo, or run `gcloud auth application-default login` |
-| Port 4000 in use | Stop other process or change `PORT` |
-| Auth / diseases / chats fail | GCS required — complete [Storage setup](#storage-setup-gcs) |
-| React hydration warning (`bis_use`, Bitdefender, etc.) | Theme loads via `public/mediassist-theme-init.js` + `next/script` (not inline React `<script>`); hard refresh after pull |
-| React hydration warning in Cursor browser | Often `data-cursor-ref` from embedded browser; test in Chrome/Edge |
-| `429` / quota errors from OpenAI | Wait a few minutes; check usage; ensure credit balance > $0 |
-| Dark / light toggle seems stuck | Hard refresh; preference is `mediassist-theme` in `localStorage` |
-| LAN dev HMR blocked (`192.168.x.x`) | Add your host to `allowedDevOrigins` in `frontend/next.config.ts` and restart `npm run dev` |
-| Password in browser URL on login | Use `method="post"` on the form (fixed); clear query string from the address bar |
-
----
-
-## Quality audit (recent fixes)
-
-A full-stack review addressed the following (see git history for details):
-
-| Area | Issue | Fix |
-|------|--------|-----|
-| **Auth / storage** | Login/signup returned opaque 500 when `STORAGE_ENABLED=false` | Auth & chat routes return **503** with a clear message; `require_storage` dependency |
-| **Security** | `POST /api/health/init-storage` open to anyone | **Blocked in production** (`APP_ENV=production`); use only in dev |
-| **Security** | Default `AUTH_SECRET` in production | Server **refuses to start** if `APP_ENV=production` and secret is still the dev default |
-| **Chats** | Invalid session IDs silently dropped on sync | **400** validation — session `id` must be a UUID |
-| **Frontend** | Guest profile not editable from chat UI | Sidebar **Health profile** opens drawer for guests and signed-in users |
-| **Frontend** | Guest chats/profile lost after login | **Merge** guest `localStorage` into account on sign-in |
-| **Frontend** | Profile drawer PATCH on every keystroke | **Debounced** sync (~800ms) to the API |
-| **Frontend** | Signup redirect raced to home instead of profile | Signup uses **`authRedirect("/profile")`** only |
-| **Frontend** | Header status badges noisy in dev | **Removed** API/GCS/OpenAI badges and Test OpenAI button |
-| **Frontend** | Theme `<script>` hydration vs AV extensions | Theme init moved to **static JS** (`mediassist-theme-init.js`) |
-| **Frontend** | Duplicate Log in/Sign up on auth pages | Hidden in header on `/login` and `/signup` |
-| **UX** | Login form used GET (credentials in URL) | **`method="post"`** + query param stripper |
-
-**Still intentional / known limits:**
-
-- `POST /api/health/decision` is **public** (no auth) — add rate limits or API keys before high-traffic production.
-- Chat sync is **last-write-wins** (no optimistic concurrency on chat blobs yet).
-- Only the **latest** assistant turn shows the rich triage card in the UI (older per-turn decisions are not stored).
-
----
-
-## Production notes
-
-- Set a strong `AUTH_SECRET` and real `OPENAI_API_KEY` via host secrets (never commit `.env`).
-- Use a regional GCS bucket co-located with your backend for low latency.
-- In production deploy with a managed service account (e.g. Cloud Run / GKE Workload Identity) instead of mounting a JSON key.
-- Deploy frontend with `NEXT_PUBLIC_API_URL` pointing at your API.
-- This app is for **education only** — not a medical device.
-
----
-
-## Disclaimer
-
-This application is for **educational purposes only**. It does not provide medical diagnosis, prescriptions, or emergency services. Always consult qualified healthcare professionals. In an emergency, call your local emergency number.
+<p align="center">
+  <sub>Made with care for learning — not for replacing yours.</sub>
+</p>

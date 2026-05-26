@@ -1,6 +1,7 @@
 import type { ChatSession } from "./types";
 
-const MAX_TITLE_LEN = 42;
+/** Cap for persisted `session.title` only — display uses CSS truncate. */
+const STORED_TITLE_MAX = 80;
 
 function capitalizeFirst(text: string): string {
   if (!text) return text;
@@ -25,39 +26,55 @@ function stripLeadIns(text: string): string {
   return t.trim();
 }
 
-/** First clause/sentence — avoids mid-sentence ellipsis on long prompts. */
+/** First clause/sentence — avoids multi-line prompts in the sidebar. */
 function firstClause(text: string): string {
   const match = text.match(/^[^.!?\n]+/);
   return (match?.[0] ?? text).trim();
 }
 
-/**
- * Short label for sidebar rows from the user's first message.
- * Word-boundary trim with a single ellipsis when needed (no raw 40-char chop).
- */
-export function summarizeChatTitle(raw: string): string {
+/** Readable topic from the user's message (no length chop — sidebar truncates visually). */
+export function cleanSessionTopic(raw: string): string {
   const normalized = raw.replace(/\s+/g, " ").trim();
   if (!normalized) return "New chat";
 
   let topic = stripLeadIns(firstClause(normalized));
   if (!topic) topic = normalized;
 
-  if (topic.length <= MAX_TITLE_LEN) return capitalizeFirst(topic);
+  return capitalizeFirst(topic);
+}
 
-  const slice = topic.slice(0, MAX_TITLE_LEN);
+function trimForStorage(topic: string): string {
+  if (topic.length <= STORED_TITLE_MAX) return topic;
+
+  const slice = topic.slice(0, STORED_TITLE_MAX);
   const lastSpace = slice.lastIndexOf(" ");
   const cut =
-    lastSpace >= Math.floor(MAX_TITLE_LEN * 0.45)
+    lastSpace >= Math.floor(STORED_TITLE_MAX * 0.5)
       ? slice.slice(0, lastSpace)
       : slice.trimEnd();
 
-  return capitalizeFirst(`${cut}…`);
+  return `${cut}…`;
 }
 
-/** Prefer first user message over stored title (fixes legacy truncated titles). */
+/** Title saved on the session object (may be long; UI still prefers first user message). */
+export function summarizeChatTitle(raw: string): string {
+  const topic = cleanSessionTopic(raw);
+  if (topic === "New chat") return topic;
+  return trimForStorage(topic);
+}
+
+/** Label in the sidebar — uses full cleaned topic; ellipsis only when the row runs out of width. */
 export function sessionDisplayTitle(session: ChatSession): string {
   const firstUser = session.messages.find((m) => m.role === "user");
   const source = firstUser?.text?.trim() || session.title?.trim();
   if (!source) return "New chat";
-  return summarizeChatTitle(source);
+  return cleanSessionTopic(source);
+}
+
+/** Native tooltip — full first message when truncated in the list. */
+export function sessionTooltipTitle(session: ChatSession): string {
+  const firstUser = session.messages.find((m) => m.role === "user");
+  const source = firstUser?.text?.trim() || session.title?.trim();
+  if (!source) return "New chat";
+  return source.replace(/\s+/g, " ").trim();
 }

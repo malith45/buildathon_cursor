@@ -10,9 +10,10 @@ import { dispatchOpenProfileDrawer } from "@/lib/ui-events";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/lib/toast";
+import BrandLogo from "@/components/BrandLogo";
 import { APP_NAME } from "@/lib/brand";
 import ThemeToggle from "@/components/ThemeToggle";
-import { Activity, LogOut, User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 
 const AUTH_ROUTES = new Set(["/login", "/signup"]);
 
@@ -38,13 +39,10 @@ export default function AppHeader() {
         <div className="mx-auto flex h-12 max-w-[1500px] items-center gap-2 px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
-            className="group/logo flex items-center gap-2.5 font-heading text-sm font-semibold text-foreground"
+            className="group/logo transition-transform hover:scale-[1.02]"
             aria-label={`${APP_NAME} — home`}
           >
-            <span className="flex size-8 items-center justify-center rounded-xl bg-linear-to-br from-primary to-lavender text-primary-foreground shadow-sm transition-transform group-hover/logo:scale-105">
-              <Activity className="size-4" />
-            </span>
-            <span className="hidden sm:inline">{APP_NAME}</span>
+            <BrandLogo size="sm" />
           </Link>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
